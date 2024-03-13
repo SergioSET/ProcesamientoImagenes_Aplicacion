@@ -1,0 +1,4 @@
+tk
+Pillow
+nibabel
+matplotlib
