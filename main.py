@@ -20,7 +20,9 @@ class GUI:
         self.file_path = None
         self.shape = None
 
-        self.color = "red"
+        self.color1 = "red"
+        self.color2 = "green"
+        self.current_color = self.color1
         self.brush_size = 5
         self.image = None
         self.image_visible = True
@@ -59,29 +61,30 @@ class GUI:
         color_label = tk.Label(toolbar, text="Color:")
         color_label.grid(row=0, column=0)
 
-        self.color_button = tk.Button(
-            toolbar, bg=self.color, width=10, command=self.choose_color
-        )
-        self.color_button.grid(row=0, column=1)
+        self.color_button1 = tk.Button(toolbar, bg=self.color1, width=5, command=lambda: self.change_color(self.color1))
+        self.color_button1.grid(row=0, column=1)
+
+        self.color_button2 = tk.Button(toolbar, bg=self.color2, width=5, command=lambda: self.change_color(self.color2))
+        self.color_button2.grid(row=0, column=2)
 
         brush_label = tk.Label(toolbar, text="Tamaño del pincel:")
-        brush_label.grid(row=0, column=2)
+        brush_label.grid(row=0, column=3)
 
         self.brush_slider = tk.Scale(
             toolbar, from_=1, to=20, orient=tk.HORIZONTAL, command=self.set_brush_size
         )
         self.brush_slider.set(self.brush_size)
-        self.brush_slider.grid(row=0, column=3)
+        self.brush_slider.grid(row=0, column=4)
 
         toggle_drawings_button = tk.Button(
             toolbar, text="Toggle Dibujos", command=self.toggle_drawings
         )
-        toggle_drawings_button.grid(row=0, column=4)
+        toggle_drawings_button.grid(row=0, column=5)
 
         toggle_image_button = tk.Button(
             toolbar, text="Toggle Imagen", command=self.toggle_image
         )
-        toggle_image_button.grid(row=0, column=5)
+        toggle_image_button.grid(row=0, column=6)
 
         self.combobox = ttk.Combobox(
             toolbar,
@@ -103,13 +106,12 @@ class GUI:
             x1, y1 = (event.x - self.brush_size), (event.y - self.brush_size)
             x2, y2 = (event.x + self.brush_size), (event.y + self.brush_size)
             drawing_object = self.canvas.create_oval(
-                x1, y1, x2, y2, fill=self.color, outline=self.color
+                x1, y1, x2, y2, fill=self.current_color, outline=self.current_color
             )
             self.drawing_objects.append(drawing_object)
 
-    def choose_color(self):
-        self.color = colorchooser.askcolor(initialcolor=self.color)[1]
-        self.color_button.config(bg=self.color)
+    def change_color(self, color):
+        self.current_color = color
 
     def set_brush_size(self, val):
         self.brush_size = int(val)
