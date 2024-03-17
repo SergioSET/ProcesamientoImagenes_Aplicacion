@@ -1,10 +1,12 @@
 import tkinter as tk
-from tkinter import filedialog, colorchooser, messagebox, ttk
-from PIL import Image, ImageDraw, ImageTk
+from tkinter import filedialog, messagebox, ttk
+from PIL import Image, ImageTk
 import nibabel as nib
 import numpy as np
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-import matplotlib.pyplot as plt
+from tkinter import *
+from tkinter.ttk import *
+import tkinter as tk
+from PIL import Image, ImageTk
 
 
 class GUI:
@@ -220,7 +222,28 @@ class GUI:
         self.layer_slider.grid()
 
     def umbralizacion_image(self):
-        print("Umbralización")
+        newWindow = Toplevel(self.root)
+        newWindow.title("Umbralización")
+
+        selected_dimension_index = self.combobox.current()
+        value = self.layer_slider.get()
+
+        if selected_dimension_index == 0:
+            data_slice = np.rot90(self.data[value, :, :])
+        elif selected_dimension_index == 1:
+            data_slice = np.rot90(self.data[:, value, :])
+        elif selected_dimension_index == 2:
+            data_slice = np.rot90(self.data[:, :, value])
+
+        image = Image.fromarray(data_slice)
+        image = image.resize((image.width * 2, image.height * 2))
+        image = ImageTk.PhotoImage(image)
+
+        image_label = Label(newWindow, image=image)
+        image_label.image = image
+        image_label.pack()
+
+        newWindow.mainloop()
 
     def isodata_image(self):
         print("Isodata")
