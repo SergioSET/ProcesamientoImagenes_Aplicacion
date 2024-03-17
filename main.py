@@ -50,6 +50,17 @@ class GUI:
         edit_menu.add_command(label="Toggle Dibujos", command=self.toggle_drawings)
         edit_menu.add_command(label="Toggle Imagen", command=self.toggle_image)
 
+        algorithms_menu = tk.Menu(menu_bar, tearoff=0)
+        menu_bar.add_cascade(label="Segmentación", menu=algorithms_menu)
+        algorithms_menu.add_command(
+            label="Umbralización", command=self.umbralizacion_image
+        )
+        algorithms_menu.add_command(label="Isodata", command=self.isodata_image)
+        algorithms_menu.add_command(
+            label="Crecimiento de regiones", command=self.crecimiento_image
+        )
+        algorithms_menu.add_command(label="K-means", command=self.kmeans_image)
+
         help_menu = tk.Menu(menu_bar, tearoff=0)
         menu_bar.add_cascade(label="Ayuda", menu=help_menu)
         help_menu.add_command(label="Acerca de", command=self.show_about_dialog)
@@ -208,8 +219,17 @@ class GUI:
         self.layer_slider.set(0)
         self.layer_slider.grid()
 
-    def prueba(self, event):
-        print(self.layer_slider.get())
+    def umbralizacion_image(self):
+        print("Umbralización")
+
+    def isodata_image(self):
+        print("Isodata")
+
+    def crecimiento_image(self):
+        print("Crecimiento")
+
+    def kmeans_image(self):
+        print("K-means")
 
     def show_about_dialog(self):
         about_text = "Procesamiento de imágenes\n\nVersión 1.0\nDesarrollado por Sergio Escudero Tabares"
