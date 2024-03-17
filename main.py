@@ -61,10 +61,20 @@ class GUI:
         color_label = tk.Label(toolbar, text="Color:")
         color_label.grid(row=0, column=0)
 
-        self.color_button1 = tk.Button(toolbar, bg=self.color1, width=5, command=lambda: self.change_color(self.color1))
+        self.color_button1 = tk.Button(
+            toolbar,
+            bg=self.color1,
+            width=5,
+            command=lambda: self.change_color(self.color1),
+        )
         self.color_button1.grid(row=0, column=1)
 
-        self.color_button2 = tk.Button(toolbar, bg=self.color2, width=5, command=lambda: self.change_color(self.color2))
+        self.color_button2 = tk.Button(
+            toolbar,
+            bg=self.color2,
+            width=5,
+            command=lambda: self.change_color(self.color2),
+        )
         self.color_button2.grid(row=0, column=2)
 
         brush_label = tk.Label(toolbar, text="Tamaño del pincel:")
