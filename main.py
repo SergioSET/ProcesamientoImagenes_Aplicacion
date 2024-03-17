@@ -1,6 +1,10 @@
 import tkinter as tk
-from tkinter import filedialog, colorchooser, messagebox
+from tkinter import filedialog, colorchooser, messagebox, ttk
 from PIL import Image, ImageDraw, ImageTk
+import nibabel as nib
+import numpy as np
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import matplotlib.pyplot as plt
 
 class GUI:
     def __init__(self, root):
@@ -12,12 +16,18 @@ class GUI:
 
         self.canvas.bind("<B1-Motion>", self.draw)
 
+        self.file_path = None
+        self.shape = None
+
         self.color = "red"
         self.brush_size = 5
         self.image = None
         self.image_visible = True
         self.drawings_visible = True
         self.drawing_objects = []
+        self.image_id = None
+        self.nib_img = None
+        self.data = None
 
         self.setup_menu()
         self.setup_toolbar()
@@ -48,27 +58,52 @@ class GUI:
         color_label = tk.Label(toolbar, text="Color:")
         color_label.grid(row=0, column=0)
 
-        self.color_button = tk.Button(toolbar, bg=self.color, width=10, command=self.choose_color)
+        self.color_button = tk.Button(
+            toolbar, bg=self.color, width=10, command=self.choose_color
+        )
         self.color_button.grid(row=0, column=1)
 
         brush_label = tk.Label(toolbar, text="Tamaño del pincel:")
         brush_label.grid(row=0, column=2)
 
-        self.brush_slider = tk.Scale(toolbar, from_=1, to=20, orient=tk.HORIZONTAL, command=self.set_brush_size)
+        self.brush_slider = tk.Scale(
+            toolbar, from_=1, to=20, orient=tk.HORIZONTAL, command=self.set_brush_size
+        )
         self.brush_slider.set(self.brush_size)
         self.brush_slider.grid(row=0, column=3)
 
-        toggle_drawings_button = tk.Button(toolbar, text="Toggle Dibujos", command=self.toggle_drawings)
+        toggle_drawings_button = tk.Button(
+            toolbar, text="Toggle Dibujos", command=self.toggle_drawings
+        )
         toggle_drawings_button.grid(row=0, column=4)
 
-        toggle_image_button = tk.Button(toolbar, text="Toggle Imagen", command=self.toggle_image)
+        toggle_image_button = tk.Button(
+            toolbar, text="Toggle Imagen", command=self.toggle_image
+        )
         toggle_image_button.grid(row=0, column=5)
+
+        self.combobox = ttk.Combobox(
+            toolbar,
+            values=[f"Dimensión {i+1}" for i in range(0)],
+            state="readonly",
+        )
+        self.combobox.grid(row=1, column=2)
+        self.combobox.bind("<<ComboboxSelected>>", self.show_slider)
+        self.combobox.grid_remove()
+
+        self.layer_slider = tk.Scale(
+            toolbar, from_=0, to=100, orient=tk.HORIZONTAL, command=self.update_image
+        )
+        self.layer_slider.grid(row=1, column=4)
+        self.layer_slider.grid_remove()
 
     def draw(self, event):
         if self.drawings_visible:
             x1, y1 = (event.x - self.brush_size), (event.y - self.brush_size)
             x2, y2 = (event.x + self.brush_size), (event.y + self.brush_size)
-            drawing_object = self.canvas.create_oval(x1, y1, x2, y2, fill=self.color, outline=self.color)
+            drawing_object = self.canvas.create_oval(
+                x1, y1, x2, y2, fill=self.color, outline=self.color
+            )
             self.drawing_objects.append(drawing_object)
 
     def choose_color(self):
@@ -105,17 +140,69 @@ class GUI:
                 self.canvas.itemconfig(drawing_object, state="normal")
         self.drawings_visible = not self.drawings_visible
 
+    def show_combobox(self):
+        if self.file_path:
+            self.nib_img = nib.load(self.file_path)
+            self.data = self.nib_img.get_fdata()
+            dimensions = len(self.data.shape)
+        else:
+            dimensions = 0
+
+        self.combobox["values"] = [f"Dimensión {i+1}" for i in range(dimensions)]
+        self.combobox.grid()
+
     def open_image(self):
-        file_path = filedialog.askopenfilename(filetypes=[("Archivos de imagen", "*.png;*.jpg;*.jpeg")])
+        file_path = filedialog.askopenfilename(filetypes=[("Archivo NIIfTI", "*.nii;")])
+
         if file_path:
-            image = Image.open(file_path)
+            self.file_path = file_path
+            self.shape = nib.load(self.file_path).shape
+            self.show_combobox()
+
+    def update_image(self, event=None):
+        try:
+            if self.nib_img is not None:
+                value = self.layer_slider.get()
+
+                selected_dimension_index = self.combobox.current()
+
+                if selected_dimension_index == 0:
+                    data_slice = np.rot90(self.data[value, :, :])
+                elif selected_dimension_index == 1:
+                    data_slice = np.rot90(self.data[:, value, :])
+                elif selected_dimension_index == 2:
+                    data_slice = np.rot90(self.data[:, :, value])
+
+                image = Image.fromarray(data_slice)
+
+                image = image.resize((image.width * 2, image.height * 2))
+
+
             self.image = ImageTk.PhotoImage(image)
-            self.image_id = self.canvas.create_image(0, 0, anchor=tk.NW, image=self.image)
-            self.root.geometry(f"{self.image.width()}x{self.image.height()+60}")
+
+            if self.image_id is not None:
+                self.canvas.delete(self.image_id)
+            self.image_id = self.canvas.create_image(
+                0, 0, anchor=tk.NW, image=self.image
+            )
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Error al cargar el archivo NIfTI: {str(e)}")
+
+    def show_slider(self, event=None):
+        value = self.shape[self.combobox.current()]
+
+        self.layer_slider["to"] = value - 1
+        self.layer_slider.set(0)
+        self.layer_slider.grid()
+
+    def prueba(self, event):
+        print(self.layer_slider.get())
 
     def show_about_dialog(self):
         about_text = "Procesamiento de imágenes\n\nVersión 1.0\nDesarrollado por Sergio Escudero Tabares"
         messagebox.showinfo("Acerca de", about_text)
+
 
 root = tk.Tk()
 app = GUI(root)
