@@ -251,6 +251,12 @@ class GUI:
         image_label.pack()
 
         def umbralizar_imagen(tau):
+            if tau < 0:
+                messagebox.showerror(
+                    "Error", "El valor de tau debe ser mayor o igual a 0"
+                )
+                return
+
             imagen_umbralizada = self.image_umbralizar(data_slice, tau)
             image_umbralizada = Image.fromarray(imagen_umbralizada)
             image_umbralizada = image_umbralizada.resize(
@@ -260,6 +266,22 @@ class GUI:
             image_label.configure(image=self.image_umbralizada_tk)
             image_label.image = self.image_umbralizada_tk
 
+        def guardar_imagen_umbralizada():
+            file_path = filedialog.asksaveasfilename(
+                defaultextension=".png",
+                initialfile="Dimension_{}_Slice_{}_umbralizada.png".format(
+                    selected_dimension_index + 1, value
+                ),
+                filetypes=[("Archivo PNG", "*.png")],
+                title="Guardar imagen umbralizada",
+            )
+            if file_path:
+                imagen_umbralizada = self.image_umbralizar(
+                    data_slice, float(entry_tau.get())
+                )
+                image_umbralizada = Image.fromarray(imagen_umbralizada)
+                image_umbralizada.save(file_path)
+
         def calcular_tau_otsu():
             tau_otsu = filters.threshold_otsu(data_slice)
             entry_tau.delete(0, "end")
@@ -267,6 +289,7 @@ class GUI:
             umbralizar_imagen(tau_otsu)
 
         entry_tau = Entry(newWindow)
+        entry_tau.insert(0, "0")
         entry_tau.pack()
 
         button_umbralizar = Button(
@@ -280,6 +303,11 @@ class GUI:
             newWindow, text="Calcular Tau (Otsu)", command=calcular_tau_otsu
         )
         button_tau_otsu.pack()
+
+        button_guardar = Button(
+            newWindow, text="Guardar Imagen", command=guardar_imagen_umbralizada
+        )
+        button_guardar.pack()
 
         newWindow.mainloop()
 
