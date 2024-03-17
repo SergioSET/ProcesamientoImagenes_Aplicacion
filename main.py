@@ -41,7 +41,10 @@ class GUI:
 
         file_menu = tk.Menu(menu_bar, tearoff=0)
         menu_bar.add_cascade(label="Archivo", menu=file_menu)
-        file_menu.add_command(label="Cargar imagen", command=self.open_image)
+        file_menu.add_command(label="Cargar archivo .nii", command=self.open_image)
+        file_menu.add_command(
+            label="Cargar archivo .nii por defecto", command=self.open_default_image
+        )
 
         edit_menu = tk.Menu(menu_bar, tearoff=0)
         menu_bar.add_cascade(label="Editar", menu=edit_menu)
@@ -174,6 +177,8 @@ class GUI:
 
         self.combobox["values"] = [f"Dimensión {i+1}" for i in range(dimensions)]
         self.combobox.grid()
+        self.combobox.set("Dimensión 1")
+        self.show_slider()
 
     def open_image(self):
         file_path = filedialog.askopenfilename(filetypes=[("Archivo NIIfTI", "*.nii;")])
@@ -182,6 +187,11 @@ class GUI:
             self.file_path = file_path
             self.shape = nib.load(self.file_path).shape
             self.show_combobox()
+
+    def open_default_image(self):
+        self.file_path = "sub-01_T1w.nii"
+        self.shape = nib.load(self.file_path).shape
+        self.show_combobox()
 
     def update_image(self, event=None):
         try:
@@ -253,9 +263,7 @@ class GUI:
         def calcular_tau_otsu():
             tau_otsu = filters.threshold_otsu(data_slice)
             entry_tau.delete(0, "end")
-            entry_tau.insert(
-                0, str(tau_otsu)
-            )
+            entry_tau.insert(0, str(tau_otsu))
             umbralizar_imagen(tau_otsu)
 
         entry_tau = Entry(newWindow)
