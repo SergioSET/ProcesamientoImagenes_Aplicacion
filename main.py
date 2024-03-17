@@ -6,6 +6,7 @@ import numpy as np
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.pyplot as plt
 
+
 class GUI:
     def __init__(self, root):
         self.root = root
@@ -176,7 +177,6 @@ class GUI:
                 image = Image.fromarray(data_slice)
 
                 image = image.resize((image.width * 2, image.height * 2))
-
 
             self.image = ImageTk.PhotoImage(image)
 
