@@ -115,15 +115,39 @@ class GUI:
             values=[f"Dimensión {i+1}" for i in range(0)],
             state="readonly",
         )
-        self.combobox.grid(row=1, column=3)
+        self.combobox.grid(row=1, column=2)
         self.combobox.bind("<<ComboboxSelected>>", self.show_slider)
         self.combobox.grid_remove()
 
         self.layer_slider = tk.Scale(
             toolbar, from_=0, to=100, orient=tk.HORIZONTAL, command=self.update_image
         )
-        self.layer_slider.grid(row=1, column=4)
+        self.layer_slider.grid(row=1, column=3)
         self.layer_slider.grid_remove()
+
+        self.layer_entry = tk.Entry(toolbar)
+        self.layer_entry.grid(row=1, column=4)
+        self.layer_entry.grid_remove()
+
+        self.apply_button = tk.Button(
+            toolbar, text="Aplicar", command=self.apply_layer_value
+        )
+        self.apply_button.grid(row=1, column=5)
+        self.apply_button.grid_remove()
+
+    def apply_layer_value(self):
+        try:
+            value = int(self.layer_entry.get())
+            if 0 <= value <= self.layer_slider["to"]:
+                self.layer_slider.set(value)
+                self.update_image()
+            else:
+                self.layer_slider.set(self.layer_slider["to"])
+                self.layer_entry.delete(0, "end")
+                self.layer_entry.insert(0, int(self.layer_slider["to"]))
+                self.update_image()
+        except ValueError:
+            messagebox.showerror("Error", "Por favor, ingrese un valor entero")
 
     def draw(self, event):
         if self.drawings_visible:
@@ -179,6 +203,9 @@ class GUI:
         self.combobox.grid()
         self.combobox.set("Dimensión 1")
         self.show_slider()
+        self.layer_entry.grid()
+        self.apply_button.grid()
+        self.update_image()
 
     def open_image(self):
         file_path = filedialog.askopenfilename(filetypes=[("Archivo NIIfTI", "*.nii;")])
