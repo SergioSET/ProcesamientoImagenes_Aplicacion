@@ -1,12 +1,10 @@
 import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
+from tkinter import Toplevel, filedialog, messagebox, ttk
 from PIL import Image, ImageTk
 import nibabel as nib
 import numpy as np
-from tkinter import *
 from tkinter.ttk import *
-import tkinter as tk
-from PIL import Image, ImageTk
+from skimage import filters
 
 
 class GUI:
@@ -114,7 +112,7 @@ class GUI:
             values=[f"Dimensión {i+1}" for i in range(0)],
             state="readonly",
         )
-        self.combobox.grid(row=1, column=2)
+        self.combobox.grid(row=1, column=3)
         self.combobox.bind("<<ComboboxSelected>>", self.show_slider)
         self.combobox.grid_remove()
 
@@ -237,13 +235,50 @@ class GUI:
 
         image = Image.fromarray(data_slice)
         image = image.resize((image.width * 2, image.height * 2))
-        image = ImageTk.PhotoImage(image)
+        self.image_original = ImageTk.PhotoImage(image)
 
-        image_label = Label(newWindow, image=image)
-        image_label.image = image
+        image_label = Label(newWindow, image=self.image_original)
         image_label.pack()
 
+        def umbralizar_imagen(tau):
+            imagen_umbralizada = self.image_umbralizar(data_slice, tau)
+            image_umbralizada = Image.fromarray(imagen_umbralizada)
+            image_umbralizada = image_umbralizada.resize(
+                (image_umbralizada.width * 2, image_umbralizada.height * 2)
+            )
+            self.image_umbralizada_tk = ImageTk.PhotoImage(image_umbralizada)
+            image_label.configure(image=self.image_umbralizada_tk)
+            image_label.image = self.image_umbralizada_tk
+
+        def calcular_tau_otsu():
+            tau_otsu = filters.threshold_otsu(data_slice)
+            entry_tau.delete(0, "end")
+            entry_tau.insert(
+                0, str(tau_otsu)
+            )
+            umbralizar_imagen(tau_otsu)
+
+        entry_tau = Entry(newWindow)
+        entry_tau.pack()
+
+        button_umbralizar = Button(
+            newWindow,
+            text="Umbralizar",
+            command=lambda: umbralizar_imagen(float(entry_tau.get())),
+        )
+        button_umbralizar.pack()
+
+        button_tau_otsu = Button(
+            newWindow, text="Calcular Tau (Otsu)", command=calcular_tau_otsu
+        )
+        button_tau_otsu.pack()
+
         newWindow.mainloop()
+
+    def image_umbralizar(self, imagen, tau):
+        imagen_umbralizada = np.zeros_like(imagen)
+        imagen_umbralizada[imagen >= tau] = 255
+        return imagen_umbralizada
 
     def isodata_image(self):
         print("Isodata")

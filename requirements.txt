@@ -1,4 +1,6 @@
 tk
-Pillow
-nibabel
 matplotlib
+numpy
+nibabel
+pillow
+scikit-image
