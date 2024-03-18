@@ -5,6 +5,7 @@ import nibabel as nib
 import numpy as np
 from tkinter.ttk import *
 from skimage import filters
+import matplotlib.pyplot as plt
 
 
 class GUI:
@@ -284,16 +285,16 @@ class GUI:
                 )
                 return
 
-            imagen_umbralizada = self.image_umbralizar(data_slice, tau)
+            imagen_umbralizada = self.umbralizar_image(data_slice, tau)
             image_umbralizada = Image.fromarray(imagen_umbralizada)
             image_umbralizada = image_umbralizada.resize(
                 (image_umbralizada.width * 2, image_umbralizada.height * 2)
-            )
+            ).convert("RGB")
             self.image_umbralizada_tk = ImageTk.PhotoImage(image_umbralizada)
             image_label.configure(image=self.image_umbralizada_tk)
             image_label.image = self.image_umbralizada_tk
 
-        def guardar_imagen_umbralizada():
+        def guardar_imagen_umbralizacion():
             file_path = filedialog.asksaveasfilename(
                 defaultextension=".png",
                 initialfile="Dimension_{}_Slice_{}_umbralizada.png".format(
@@ -303,17 +304,12 @@ class GUI:
                 title="Guardar imagen umbralizada",
             )
             if file_path:
-                imagen_umbralizada = self.image_umbralizar(
+                imagen_umbralizada = self.umbralizar_image(
                     data_slice, float(entry_tau.get())
                 )
                 image_umbralizada = Image.fromarray(imagen_umbralizada)
+                image_umbralizada = image_umbralizada.convert("RGB")
                 image_umbralizada.save(file_path)
-
-        def calcular_tau_otsu():
-            tau_otsu = filters.threshold_otsu(data_slice)
-            entry_tau.delete(0, "end")
-            entry_tau.insert(0, str(tau_otsu))
-            umbralizar_imagen(tau_otsu)
 
         entry_tau = Entry(newWindow)
         entry_tau.insert(0, "0")
@@ -326,25 +322,99 @@ class GUI:
         )
         button_umbralizar.pack()
 
-        button_tau_otsu = Button(
-            newWindow, text="Calcular Tau (Otsu)", command=calcular_tau_otsu
-        )
-        button_tau_otsu.pack()
-
         button_guardar = Button(
-            newWindow, text="Guardar Imagen", command=guardar_imagen_umbralizada
+            newWindow, text="Guardar Imagen", command=guardar_imagen_umbralizacion
         )
         button_guardar.pack()
 
         newWindow.mainloop()
 
-    def image_umbralizar(self, imagen, tau):
+    def umbralizar_image(self, imagen, tau):
         imagen_umbralizada = np.zeros_like(imagen)
         imagen_umbralizada[imagen >= tau] = 255
         return imagen_umbralizada
 
     def isodata_image(self):
-        print("Isodata")
+        selected_dimension_index = self.combobox.current()
+        value = self.layer_slider.get()
+        if selected_dimension_index == 0:
+            data_slice = np.rot90(self.data[value, :, :])
+        elif selected_dimension_index == 1:
+            data_slice = np.rot90(self.data[:, value, :])
+        elif selected_dimension_index == 2:
+            data_slice = np.rot90(self.data[:, :, value])
+        image = Image.fromarray(data_slice)
+        image = image.resize((image.width * 2, image.height * 2))
+        histogram = np.histogram(data_slice, bins=256, range=(0, 255))[0]
+
+        tau = self.calcular_isodata(histogram)
+
+        imagen_umbralizada = self.umbralizar_image(data_slice, tau)
+
+        newWindow = Toplevel(self.root)
+        newWindow.title("Umbralización con Isodata")
+
+        image_original = ImageTk.PhotoImage(image)
+        image_label_original = Label(newWindow, image=image_original)
+        image_label_original.pack(side="left")
+
+        image_umbralizada = Image.fromarray(imagen_umbralizada)
+        image_umbralizada = image_umbralizada.resize(
+            (image_umbralizada.width * 2, image_umbralizada.height * 2)
+        )
+        image_umbralizada_tk = ImageTk.PhotoImage(image_umbralizada)
+        image_label_umbralizada = Label(newWindow, image=image_umbralizada_tk)
+        image_label_umbralizada.pack(side="right")
+
+        def guardar_imagen_isodata():
+            file_path = filedialog.asksaveasfilename(
+                defaultextension=".png",
+                initialfile="Dimension_{}_Slice_{}_isodata.png".format(
+                    selected_dimension_index + 1, value
+                ),
+                filetypes=[("Archivo PNG", "*.png")],
+                title="Guardar imagen umbralizada con isodata",
+            )
+            if file_path:
+                imagen_umbralizada = self.umbralizar_image(data_slice, tau)
+                image_umbralizada = Image.fromarray(imagen_umbralizada)
+                image_umbralizada = image_umbralizada.convert("RGB")
+                image_umbralizada.save(file_path)
+
+        button_guardar = Button(
+            newWindow, text="Guardar Imagen", command=guardar_imagen_isodata
+        )
+        button_guardar.pack()
+
+        newWindow.mainloop()
+
+    def calcular_isodata(self, histogram):
+        tau = 128
+        mean = sum(i * hist for i, hist in enumerate(histogram)) / sum(histogram)
+
+        while True:
+            class1 = sum(hist for i, hist in enumerate(histogram) if i <= tau)
+            class2 = sum(hist for i, hist in enumerate(histogram) if i > tau)
+
+            mean1 = (
+                sum(i * hist for i, hist in enumerate(histogram) if i <= tau) / class1
+                if class1 != 0
+                else 0
+            )
+            mean2 = (
+                sum(i * hist for i, hist in enumerate(histogram) if i > tau) / class2
+                if class2 != 0
+                else 0
+            )
+
+            new_tau = (mean1 + mean2) / 2
+
+            if abs(tau - new_tau) < 0.5:
+                break
+
+            tau = new_tau
+
+        return tau
 
     def crecimiento_image(self):
         print("Crecimiento")
