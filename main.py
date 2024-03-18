@@ -334,7 +334,7 @@ class GUI:
         imagen_umbralizada[imagen >= tau] = 255
         return imagen_umbralizada
 
-    def isodata_image(self):
+    def isodata_image(self):        
         selected_dimension_index = self.combobox.current()
         value = self.layer_slider.get()
         if selected_dimension_index == 0:
@@ -354,17 +354,20 @@ class GUI:
         newWindow = Toplevel(self.root)
         newWindow.title("Umbralización con Isodata")
 
+        iso = tk.Frame(newWindow)
+        iso.pack(pady=5)
+
         image_original = ImageTk.PhotoImage(image)
-        image_label_original = Label(newWindow, image=image_original)
-        image_label_original.pack(side="left")
+        image_label_original = Label(iso, image=image_original)
+        image_label_original.grid(row=0, column=0)
 
         image_umbralizada = Image.fromarray(imagen_umbralizada)
         image_umbralizada = image_umbralizada.resize(
             (image_umbralizada.width * 2, image_umbralizada.height * 2)
         )
         image_umbralizada_tk = ImageTk.PhotoImage(image_umbralizada)
-        image_label_umbralizada = Label(newWindow, image=image_umbralizada_tk)
-        image_label_umbralizada.pack(side="right")
+        image_label_umbralizada = Label(iso, image=image_umbralizada_tk)
+        image_label_umbralizada.grid(row=0, column=1)
 
         def guardar_imagen_isodata():
             file_path = filedialog.asksaveasfilename(
@@ -382,9 +385,9 @@ class GUI:
                 image_umbralizada.save(file_path)
 
         button_guardar = Button(
-            newWindow, text="Guardar Imagen", command=guardar_imagen_isodata
+            iso, text="Guardar Imagen", command=guardar_imagen_isodata
         )
-        button_guardar.pack()
+        button_guardar.grid(row=1, column=0, columnspan=2)
 
         newWindow.mainloop()
 
