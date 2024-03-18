@@ -152,12 +152,24 @@ class GUI:
 
     def draw(self, event):
         if self.drawings_visible:
+            self.clear_draws_of_color(self.current_color)
+
             x1, y1 = (event.x - self.brush_size), (event.y - self.brush_size)
             x2, y2 = (event.x + self.brush_size), (event.y + self.brush_size)
             drawing_object = self.canvas.create_oval(
                 x1, y1, x2, y2, fill=self.current_color, outline=self.current_color
             )
-            self.drawing_objects.append(drawing_object)
+            self.drawing_objects.append((drawing_object, self.current_color))
+
+    def clear_draws_of_color(self, color):
+        for drawing_object, draw_color in self.drawing_objects:
+            if draw_color == color:
+                self.canvas.delete(drawing_object)
+        self.drawing_objects = [
+            (drawing_object, draw_color)
+            for drawing_object, draw_color in self.drawing_objects
+            if draw_color != color
+        ]
 
     def change_color(self, color):
         self.current_color = color
@@ -334,7 +346,7 @@ class GUI:
         imagen_umbralizada[imagen >= tau] = 255
         return imagen_umbralizada
 
-    def isodata_image(self):        
+    def isodata_image(self):
         selected_dimension_index = self.combobox.current()
         value = self.layer_slider.get()
         if selected_dimension_index == 0:
