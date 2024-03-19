@@ -1,37 +1,44 @@
 import tkinter as tk
+from tkinter import filedialog, ttk
+import nibabel as nib
+from tkinter.ttk import *
+import matplotlib.pyplot as plt
+import tkinter as tk
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import matplotlib.pyplot as plt
+import nibabel as nib
+import tkinter as tk
 from tkinter import Toplevel, filedialog, messagebox, ttk
 from PIL import Image, ImageTk
 import nibabel as nib
 import numpy as np
 from tkinter.ttk import *
 from skimage import filters
-import matplotlib.pyplot as plt
+import matplotlib.pyplot as pltd
 
 
 class GUI:
     def __init__(self, root):
         self.root = root
         self.root.title("Procesamiento de imágenes")
-
-        self.canvas = tk.Canvas(self.root, width=600, height=400, bg="white")
-        self.canvas.pack(fill=tk.BOTH, expand=True)
-
-        self.canvas.bind("<B1-Motion>", self.draw)
+        self.root.geometry("800x600")
 
         self.file_path = None
-        self.shape = None
+        self.file_shape = None
 
         self.color1 = "red"
         self.color2 = "green"
         self.current_color = self.color1
-        self.brush_size = 5
-        self.image = None
-        self.image_visible = True
-        self.drawings_visible = True
+        self.brush_size = 3
         self.drawing_objects = []
-        self.image_id = None
-        self.nib_img = None
+
+        self.image = None
+        self.nib_image = None
         self.data = None
+        self.thresholded_image = None
+
+        self.dimension = 0
+        self.layer = 0
 
         self.setup_menu()
         self.setup_toolbar()
@@ -42,404 +49,355 @@ class GUI:
 
         file_menu = tk.Menu(menu_bar, tearoff=0)
         menu_bar.add_cascade(label="Archivo", menu=file_menu)
-        file_menu.add_command(label="Cargar archivo .nii", command=self.open_image)
+        file_menu.add_command(label="Abrir archivo .nii", command=self.open_file)
         file_menu.add_command(
-            label="Cargar archivo .nii por defecto", command=self.open_default_image
+            label="Cargar archivo .nii por defecto", command=self.load_default_file
         )
 
-        edit_menu = tk.Menu(menu_bar, tearoff=0)
-        menu_bar.add_cascade(label="Editar", menu=edit_menu)
-        edit_menu.add_command(label="Limpiar dibujos", command=self.clear_draws_canvas)
-        edit_menu.add_command(label="Limpiar canvas", command=self.clear_canvas)
-        edit_menu.add_command(label="Toggle Dibujos", command=self.toggle_drawings)
-        edit_menu.add_command(label="Toggle Imagen", command=self.toggle_image)
-
-        algorithms_menu = tk.Menu(menu_bar, tearoff=0)
-        menu_bar.add_cascade(label="Segmentación", menu=algorithms_menu)
-        algorithms_menu.add_command(
-            label="Umbralización", command=self.umbralizacion_image
+        segmentation_menu = tk.Menu(menu_bar, tearoff=0)
+        menu_bar.add_cascade(label="Segmentación", menu=segmentation_menu)
+        segmentation_menu.add_command(
+            label="Umbralización", command=self.thresholding_image
         )
-        algorithms_menu.add_command(label="Isodata", command=self.isodata_image)
-        algorithms_menu.add_command(
-            label="Crecimiento de regiones", command=self.crecimiento_image
+        segmentation_menu.add_command(
+            label="Isodata", command=self.isodata_thresholding_image
         )
-        algorithms_menu.add_command(label="K-means", command=self.kmeans_image)
+        segmentation_menu.add_command(
+            label="Crecimiento de regiones",
+            command=self.region_growing_image,
+        )
+        segmentation_menu.add_command(
+            label="K-means", command=self.kmeans_thresholding_image
+        )
 
         help_menu = tk.Menu(menu_bar, tearoff=0)
         menu_bar.add_cascade(label="Ayuda", menu=help_menu)
-        help_menu.add_command(label="Acerca de", command=self.show_about_dialog)
+        help_menu.add_command(label="Acerca de", command=self.show_about)
 
     def setup_toolbar(self):
-        toolbar = tk.Frame(self.root)
-        toolbar.pack(pady=5)
-
-        color_label = tk.Label(toolbar, text="Color:")
-        color_label.grid(row=0, column=0)
-
-        self.color_button1 = tk.Button(
-            toolbar,
-            bg=self.color1,
-            width=5,
-            command=lambda: self.change_color(self.color1),
-        )
-        self.color_button1.grid(row=0, column=1)
-
-        self.color_button2 = tk.Button(
-            toolbar,
-            bg=self.color2,
-            width=5,
-            command=lambda: self.change_color(self.color2),
-        )
-        self.color_button2.grid(row=0, column=2)
-
-        brush_label = tk.Label(toolbar, text="Tamaño del pincel:")
-        brush_label.grid(row=0, column=3)
-
-        self.brush_slider = tk.Scale(
-            toolbar, from_=1, to=20, orient=tk.HORIZONTAL, command=self.set_brush_size
-        )
-        self.brush_slider.set(self.brush_size)
-        self.brush_slider.grid(row=0, column=4)
-
-        toggle_drawings_button = tk.Button(
-            toolbar, text="Toggle Dibujos", command=self.toggle_drawings
-        )
-        toggle_drawings_button.grid(row=0, column=5)
-
-        toggle_image_button = tk.Button(
-            toolbar, text="Toggle Imagen", command=self.toggle_image
-        )
-        toggle_image_button.grid(row=0, column=6)
+        toolbar = tk.Frame(self.root, bg="white")
+        toolbar.pack(side="bottom")
 
         self.combobox = ttk.Combobox(
             toolbar,
-            values=[f"Dimensión {i+1}" for i in range(0)],
+            values=[f"Dimensión {i+1}" for i in range(1)],
             state="readonly",
         )
-        self.combobox.grid(row=1, column=2)
-        self.combobox.bind("<<ComboboxSelected>>", self.show_slider)
+        self.combobox.grid(row=0, column=0)
+        self.combobox.current(0)
+        self.combobox.bind("<<ComboboxSelected>>", self.show_combobox_slider)
         self.combobox.grid_remove()
 
         self.layer_slider = tk.Scale(
-            toolbar, from_=0, to=100, orient=tk.HORIZONTAL, command=self.update_image
+            toolbar,
+            from_=0,
+            to=0,
+            orient="horizontal",
+            label="Capa",
+            command=self.update_image,
         )
-        self.layer_slider.grid(row=1, column=3)
+        self.layer_slider.grid(row=0, column=1)
         self.layer_slider.grid_remove()
 
         self.layer_entry = tk.Entry(toolbar)
-        self.layer_entry.grid(row=1, column=4)
+        self.layer_entry.grid(row=0, column=2)
         self.layer_entry.grid_remove()
 
-        self.apply_button = tk.Button(
+        self.apply_layer_button = tk.Button(
             toolbar, text="Aplicar", command=self.apply_layer_value
         )
-        self.apply_button.grid(row=1, column=5)
-        self.apply_button.grid_remove()
+        self.apply_layer_button.grid(row=0, column=3)
+        self.apply_layer_button.grid_remove()
+
+    def open_file(self):
+        file_path = filedialog.askopenfilename(
+            filetypes=[("NIfTI files", "*.nii"), ("All files", "*")]
+        )
+
+        if file_path:
+            self.file_path = file_path
+            self.nib_image = nib.load(file_path)
+            self.data = self.nib_image.get_fdata()
+            self.file_shape = self.data.shape
+            self.show_combobox_slider()
+
+    def load_default_file(self):
+        self.file_path = "sub-01_T1w.nii"
+        self.nib_image = nib.load(self.file_path)
+        self.data = self.nib_image.get_fdata()
+        self.file_shape = self.data.shape
+        self.show_combobox_slider()
+
+    def change_color(self, color):
+        self.current_color = color
+
+    def change_brush_size(self, size):
+        self.brush_size = int(size)
 
     def apply_layer_value(self):
         try:
             value = int(self.layer_entry.get())
             if 0 <= value <= self.layer_slider["to"]:
                 self.layer_slider.set(value)
-                self.update_image()
             else:
-                self.layer_slider.set(self.layer_slider["to"])
                 self.layer_entry.delete(0, "end")
                 self.layer_entry.insert(0, int(self.layer_slider["to"]))
-                self.update_image()
         except ValueError:
-            messagebox.showerror("Error", "Por favor, ingrese un valor entero")
+            self.layer_entry.delete(0, "end")
+            self.layer_entry.insert(0, self.layer_slider.get())
+        self.update_image()
 
-    def draw(self, event):
-        if self.drawings_visible:
-            self.clear_draws_of_color(self.current_color)
-
-            x1, y1 = (event.x - self.brush_size), (event.y - self.brush_size)
-            x2, y2 = (event.x + self.brush_size), (event.y + self.brush_size)
-            drawing_object = self.canvas.create_oval(
-                x1, y1, x2, y2, fill=self.current_color, outline=self.current_color
-            )
-            self.drawing_objects.append((drawing_object, self.current_color))
-
-    def clear_draws_of_color(self, color):
-        for drawing_object, draw_color in self.drawing_objects:
-            if draw_color == color:
-                self.canvas.delete(drawing_object)
-        self.drawing_objects = [
-            (drawing_object, draw_color)
-            for drawing_object, draw_color in self.drawing_objects
-            if draw_color != color
-        ]
-
-    def change_color(self, color):
-        self.current_color = color
-
-    def set_brush_size(self, val):
-        self.brush_size = int(val)
-
-    def clear_canvas(self):
-        self.canvas.delete("all")
-        self.root.geometry("600x400")
-        self.drawing_objects = []
-
-    def clear_draws_canvas(self):
-        for drawing_object in self.drawing_objects:
-            self.canvas.delete(drawing_object)
-        self.drawing_objects = []
-
-    def toggle_image(self):
-        if self.image is not None:
-            if self.image_visible:
-                self.canvas.itemconfig(self.image_id, state="hidden")
-            else:
-                self.canvas.itemconfig(self.image_id, state="normal")
-            self.image_visible = not self.image_visible
-
-    def toggle_drawings(self):
-        if self.drawings_visible:
-            for drawing_object in self.drawing_objects:
-                self.canvas.itemconfig(drawing_object, state="hidden")
-        else:
-            for drawing_object in self.drawing_objects:
-                self.canvas.itemconfig(drawing_object, state="normal")
-        self.drawings_visible = not self.drawings_visible
-
-    def show_combobox(self):
-        if self.file_path:
-            self.nib_img = nib.load(self.file_path)
-            self.data = self.nib_img.get_fdata()
-            dimensions = len(self.data.shape)
-        else:
-            dimensions = 0
+    def show_combobox_slider(self, *args):
+        dimensions = len(self.data.shape)
 
         self.combobox["values"] = [f"Dimensión {i+1}" for i in range(dimensions)]
         self.combobox.grid()
-        self.combobox.set("Dimensión 1")
-        self.show_slider()
-        self.layer_entry.grid()
-        self.apply_button.grid()
-        self.update_image()
 
-    def open_image(self):
-        file_path = filedialog.askopenfilename(filetypes=[("Archivo NIIfTI", "*.nii;")])
-
-        if file_path:
-            self.file_path = file_path
-            self.shape = nib.load(self.file_path).shape
-            self.show_combobox()
-
-    def open_default_image(self):
-        self.file_path = "sub-01_T1w.nii"
-        self.shape = nib.load(self.file_path).shape
-        self.show_combobox()
-
-    def update_image(self, event=None):
-        try:
-            if self.nib_img is not None:
-                value = self.layer_slider.get()
-
-                selected_dimension_index = self.combobox.current()
-
-                if selected_dimension_index == 0:
-                    data_slice = np.rot90(self.data[value, :, :])
-                elif selected_dimension_index == 1:
-                    data_slice = np.rot90(self.data[:, value, :])
-                elif selected_dimension_index == 2:
-                    data_slice = np.rot90(self.data[:, :, value])
-
-                image = Image.fromarray(data_slice)
-
-                image = image.resize((image.width * 2, image.height * 2))
-
-            self.image = ImageTk.PhotoImage(image)
-
-            if self.image_id is not None:
-                self.canvas.delete(self.image_id)
-            self.image_id = self.canvas.create_image(
-                0, 0, anchor=tk.NW, image=self.image
-            )
-
-        except Exception as e:
-            messagebox.showerror("Error", f"Error al cargar el archivo NIfTI: {str(e)}")
-
-    def show_slider(self, event=None):
-        value = self.shape[self.combobox.current()]
-
-        self.layer_slider["to"] = value - 1
+        self.layer_slider["to"] = self.file_shape[self.combobox.current()] - 1
         self.layer_slider.set(0)
         self.layer_slider.grid()
 
-    def umbralizacion_image(self):
-        newWindow = Toplevel(self.root)
-        newWindow.title("Umbralización")
+        self.layer_entry.grid()
 
-        selected_dimension_index = self.combobox.current()
-        value = self.layer_slider.get()
+        self.apply_layer_button.grid()
 
-        if selected_dimension_index == 0:
-            data_slice = np.rot90(self.data[value, :, :])
-        elif selected_dimension_index == 1:
-            data_slice = np.rot90(self.data[:, value, :])
-        elif selected_dimension_index == 2:
-            data_slice = np.rot90(self.data[:, :, value])
+        self.update_image()
 
-        image = Image.fromarray(data_slice)
-        image = image.resize((image.width * 2, image.height * 2))
-        self.image_original = ImageTk.PhotoImage(image)
+    def update_image(self, *args):
+        self.dimension = self.combobox.current()
+        self.layer = self.layer_slider.get()
 
-        image_label = Label(newWindow, image=self.image_original)
-        image_label.pack()
+        if self.dimension == 0:
+            slice_data = np.rot90(self.data[self.layer, :, :])
+        elif self.dimension == 1:
+            slice_data = np.rot90(self.data[:, self.layer, :])
+        else:
+            slice_data = np.rot90(self.data[:, :, self.layer])
 
-        def umbralizar_imagen(tau):
-            if tau < 0:
-                messagebox.showerror(
-                    "Error", "El valor de tau debe ser mayor o igual a 0"
-                )
-                return
+        if not hasattr(self, "fig"):
+            self.fig = plt.figure(figsize=(6, 6))
+            self.ax = self.fig.add_subplot(111)
 
-            imagen_umbralizada = self.umbralizar_image(data_slice, tau)
-            image_umbralizada = Image.fromarray(imagen_umbralizada)
-            image_umbralizada = image_umbralizada.resize(
-                (image_umbralizada.width * 2, image_umbralizada.height * 2)
-            ).convert("RGB")
-            self.image_umbralizada_tk = ImageTk.PhotoImage(image_umbralizada)
-            image_label.configure(image=self.image_umbralizada_tk)
-            image_label.image = self.image_umbralizada_tk
+        self.ax.clear()
+        self.ax.imshow(slice_data, cmap="gray")
+        self.ax.set_xlabel("X")
+        self.ax.set_ylabel("Y")
+        self.ax.axis("off")
+        self.ax.set_title(
+            "Dimensión {} en la capa {}".format(self.dimension + 1, self.layer)
+        )
 
-        def guardar_imagen_umbralizacion():
-            file_path = filedialog.asksaveasfilename(
-                defaultextension=".png",
-                initialfile="Dimension_{}_Slice_{}_umbralizada.png".format(
-                    selected_dimension_index + 1, value
-                ),
-                filetypes=[("Archivo PNG", "*.png")],
-                title="Guardar imagen umbralizada",
-            )
-            if file_path:
-                imagen_umbralizada = self.umbralizar_image(
-                    data_slice, float(entry_tau.get())
-                )
-                image_umbralizada = Image.fromarray(imagen_umbralizada)
-                image_umbralizada = image_umbralizada.convert("RGB")
-                image_umbralizada.save(file_path)
+        if not hasattr(self, "canvas"):
+            self.canvas = FigureCanvasTkAgg(self.fig, master=self.root)
+            self.canvas_widget = self.canvas.get_tk_widget()
+            self.canvas_widget.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
+        else:
+            self.canvas.draw()
 
-        entry_tau = Entry(newWindow)
-        entry_tau.insert(0, "0")
-        entry_tau.pack()
+    def thresholding_image(self):
+        thresholding_canvas = Toplevel(self.root)
+        thresholding_canvas.title("Umbralización")
 
-        button_umbralizar = Button(
-            newWindow,
+        if self.dimension == 0:
+            slice_data = np.rot90(self.data[self.layer, :, :])
+        elif self.dimension == 1:
+            slice_data = np.rot90(self.data[:, self.layer, :])
+        else:
+            slice_data = np.rot90(self.data[:, :, self.layer])
+
+        fig, ax = plt.subplots()
+        ax.imshow(slice_data, cmap="gray")
+        ax.axis("off")
+        ax.set_title("Umbralización")
+        fig.tight_layout()
+
+        thresholding_image = FigureCanvasTkAgg(fig, master=thresholding_canvas)
+        thresholding_image.draw()
+        thresholding_image.get_tk_widget().grid(row=0, column=0)
+
+        entry_tau = Entry(thresholding_canvas)
+        entry_tau.grid(row=1, column=0)
+
+        button_thresholding = Button(
+            thresholding_canvas,
             text="Umbralizar",
-            command=lambda: umbralizar_imagen(float(entry_tau.get())),
+            command=lambda: thresholding(),
         )
-        button_umbralizar.pack()
+        button_thresholding.grid(row=2, column=1)
 
-        button_guardar = Button(
-            newWindow, text="Guardar Imagen", command=guardar_imagen_umbralizacion
+        button_save = Button(
+            thresholding_canvas,
+            text="Guardar imagen",
+            command=lambda: self.save_image("Manual"),
         )
-        button_guardar.pack()
+        button_save.grid(row=2, column=0)
 
-        newWindow.mainloop()
+        def thresholding():
+            try:
+                tau = float(entry_tau.get())
+                thresholded_image = slice_data > tau
+                ax.imshow(thresholded_image, cmap="gray")
+                self.thresholding_image = thresholded_image
+                thresholding_image.draw()
+                ax.set_title("Umbralización con tau = {}".format(tau))
+            except ValueError:
+                messagebox.showerror("Error", "Por favor, ingrese un valor numérico")
 
-    def umbralizar_image(self, imagen, tau):
-        imagen_umbralizada = np.zeros_like(imagen)
-        imagen_umbralizada[imagen >= tau] = 255
-        return imagen_umbralizada
+    def isodata_thresholding_image(self):
+        thresholding_canvas = Toplevel(self.root)
+        thresholding_canvas.title("Isodata")
 
-    def isodata_image(self):
-        selected_dimension_index = self.combobox.current()
-        value = self.layer_slider.get()
-        if selected_dimension_index == 0:
-            data_slice = np.rot90(self.data[value, :, :])
-        elif selected_dimension_index == 1:
-            data_slice = np.rot90(self.data[:, value, :])
-        elif selected_dimension_index == 2:
-            data_slice = np.rot90(self.data[:, :, value])
-        image = Image.fromarray(data_slice)
-        image = image.resize((image.width * 2, image.height * 2))
-        histogram = np.histogram(data_slice, bins=256, range=(0, 255))[0]
+        if self.dimension == 0:
+            slice_data = np.rot90(self.data[self.layer, :, :])
+        elif self.dimension == 1:
+            slice_data = np.rot90(self.data[:, self.layer, :])
+        else:
+            slice_data = np.rot90(self.data[:, :, self.layer])
 
-        tau = self.calcular_isodata(histogram)
+        fig, ax = plt.subplots()
+        ax.imshow(slice_data, cmap="gray")
+        ax.axis("off")
+        ax.set_title("Isodata")
+        fig.tight_layout()
 
-        imagen_umbralizada = self.umbralizar_image(data_slice, tau)
+        def calcular_isodata(histogram):
+            tau = 128
+            while True:
+                class1 = sum(hist for i, hist in enumerate(histogram) if i <= tau)
+                class2 = sum(hist for i, hist in enumerate(histogram) if i > tau)
 
-        newWindow = Toplevel(self.root)
-        newWindow.title("Umbralización con Isodata")
+                mean1 = (
+                    sum(i * hist for i, hist in enumerate(histogram) if i <= tau)
+                    / class1
+                    if class1 != 0
+                    else 0
+                )
+                mean2 = (
+                    sum(i * hist for i, hist in enumerate(histogram) if i > tau)
+                    / class2
+                    if class2 != 0
+                    else 0
+                )
 
-        iso = tk.Frame(newWindow)
-        iso.pack(pady=5)
+                new_tau = (mean1 + mean2) / 2
 
-        image_original = ImageTk.PhotoImage(image)
-        image_label_original = Label(iso, image=image_original)
-        image_label_original.grid(row=0, column=0)
+                if abs(tau - new_tau) < 0.5:
+                    break
 
-        image_umbralizada = Image.fromarray(imagen_umbralizada)
-        image_umbralizada = image_umbralizada.resize(
-            (image_umbralizada.width * 2, image_umbralizada.height * 2)
+                tau = new_tau
+
+            return tau
+
+        histogram = np.histogram(slice_data, bins=256, range=(0, 255))[0]
+        tau = calcular_isodata(histogram)
+
+        thresholding_image = FigureCanvasTkAgg(fig, master=thresholding_canvas)
+        thresholding_image.draw()
+        thresholding_image.get_tk_widget().grid(row=0, column=0)
+
+        thresholded_image = slice_data > tau
+        ax.imshow(thresholded_image, cmap="gray")
+        self.thresholding_image = thresholded_image
+        thresholding_image.draw()
+        ax.set_title("Umbralización con tau = {}".format(tau))
+
+        button_save = Button(
+            thresholding_canvas,
+            text="Guardar imagen",
+            command=lambda: self.save_image("Isodata"),
         )
-        image_umbralizada_tk = ImageTk.PhotoImage(image_umbralizada)
-        image_label_umbralizada = Label(iso, image=image_umbralizada_tk)
-        image_label_umbralizada.grid(row=0, column=1)
+        button_save.grid(row=2, column=0)
 
-        def guardar_imagen_isodata():
-            file_path = filedialog.asksaveasfilename(
-                defaultextension=".png",
-                initialfile="Dimension_{}_Slice_{}_isodata.png".format(
-                    selected_dimension_index + 1, value
-                ),
-                filetypes=[("Archivo PNG", "*.png")],
-                title="Guardar imagen umbralizada con isodata",
-            )
-            if file_path:
-                imagen_umbralizada = self.umbralizar_image(data_slice, tau)
-                image_umbralizada = Image.fromarray(imagen_umbralizada)
-                image_umbralizada = image_umbralizada.convert("RGB")
-                image_umbralizada.save(file_path)
+    def region_growing_image(self):
+        region_growing_canvas = Toplevel(self.root)
+        region_growing_canvas.title("Crecimiento de regiones")
 
-        button_guardar = Button(
-            iso, text="Guardar Imagen", command=guardar_imagen_isodata
+        if self.dimension == 0:
+            slice_data = np.rot90(self.data[self.layer, :, :])
+        elif self.dimension == 1:
+            slice_data = np.rot90(self.data[:, self.layer, :])
+        else:
+            slice_data = np.rot90(self.data[:, :, self.layer])
+
+        fig, ax = plt.subplots()
+        ax.imshow(slice_data, cmap="gray")
+        ax.axis("off")
+        ax.set_title("Crecimiento de regiones")
+        fig.tight_layout()
+
+        thresholding_image = FigureCanvasTkAgg(fig, master=region_growing_canvas)
+        thresholding_image.draw()
+        thresholding_image.get_tk_widget().grid(row=0, column=0)
+
+        toolbar = tk.Frame(region_growing_canvas, bg="white")
+        toolbar.grid(row=1, column=0)
+
+        color_button1 = tk.Button(
+            toolbar,
+            text="Color 1",
+            bg=self.color1,
+            command=lambda: self.change_color(self.color1),
         )
-        button_guardar.grid(row=1, column=0, columnspan=2)
+        color_button1.grid(row=0, column=0)
 
-        newWindow.mainloop()
+        color_button2 = tk.Button(
+            toolbar,
+            text="Color 2",
+            bg=self.color2,
+            command=lambda: self.change_color(self.color2),
+        )
+        color_button2.grid(row=0, column=1)
 
-    def calcular_isodata(self, histogram):
-        tau = 128
-        mean = sum(i * hist for i, hist in enumerate(histogram)) / sum(histogram)
+        brush_size_slider = tk.Scale(
+            toolbar,
+            from_=1,
+            to=10,
+            orient="horizontal",
+            label="Tamaño del pincel",
+            command=self.change_brush_size,
+        )
+        brush_size_slider.set(self.brush_size)
+        brush_size_slider.grid(row=0, column=2)
 
-        while True:
-            class1 = sum(hist for i, hist in enumerate(histogram) if i <= tau)
-            class2 = sum(hist for i, hist in enumerate(histogram) if i > tau)
+        clean_button = tk.Button(
+            toolbar, text="Limpiar", command=lambda: self.clean_drawing(ax)
+        )
+        clean_button.grid(row=0, column=3)
 
-            mean1 = (
-                sum(i * hist for i, hist in enumerate(histogram) if i <= tau) / class1
-                if class1 != 0
-                else 0
-            )
-            mean2 = (
-                sum(i * hist for i, hist in enumerate(histogram) if i > tau) / class2
-                if class2 != 0
-                else 0
-            )
+        button_region_growth = tk.Button(
+            toolbar, text="Umbralizar", command=lambda: region_growth()
+        )
+        button_region_growth.grid(row=1, column=1)
 
-            new_tau = (mean1 + mean2) / 2
+        button_save = Button(
+            toolbar,
+            text="Guardar imagen",
+            command=lambda: self.save_image("Region_growing"),
+        )
+        button_save.grid(row=1, column=2)
 
-            if abs(tau - new_tau) < 0.5:
-                break
+    def kmeans_thresholding_image(self):
+        pass
 
-            tau = new_tau
+    def save_image(self, method):
+        file_path = filedialog.asksaveasfilename(
+            defaultextension=".png",
+            initialfile="Dimension_{}_Layer_{}_{}".format(
+                self.dimension + 1, self.layer, method
+            ),
+            filetypes=[("PNG files", "*.png"), ("All files", "*")],
+        )
 
-        return tau
+        image = self.thresholding_image
 
-    def crecimiento_image(self):
-        print("Crecimiento")
+        if file_path:
+            plt.imsave(file_path, image, cmap="gray")
 
-    def kmeans_image(self):
-        print("K-means")
-
-    def show_about_dialog(self):
-        about_text = "Procesamiento de imágenes\n\nVersión 1.0\nDesarrollado por Sergio Escudero Tabares"
-        messagebox.showinfo("Acerca de", about_text)
+    def show_about(self):
+        messagebox.showinfo(
+            "Acerca de",
+            "Esta aplicación fue desarrollada por el grupo 1 de la materia de Procesamiento de Imágenes Médicas",
+        )
 
 
 root = tk.Tk()
