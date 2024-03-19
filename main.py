@@ -260,36 +260,28 @@ class GUI:
         ax.set_title("Isodata")
         fig.tight_layout()
 
-        def calcular_isodata(histogram):
-            tau = 128
+        def calcular_isodata(image):
+            t = 0
+            delta_tau = 1
+            tau = np.mean(image)
+
             while True:
-                class1 = sum(hist for i, hist in enumerate(histogram) if i <= tau)
-                class2 = sum(hist for i, hist in enumerate(histogram) if i > tau)
+                thresholded_image = image > tau
 
-                mean1 = (
-                    sum(i * hist for i, hist in enumerate(histogram) if i <= tau)
-                    / class1
-                    if class1 != 0
-                    else 0
-                )
-                mean2 = (
-                    sum(i * hist for i, hist in enumerate(histogram) if i > tau)
-                    / class2
-                    if class2 != 0
-                    else 0
-                )
+                m_foreground = np.mean(image[thresholded_image])
+                m_background = np.mean(image[~thresholded_image])
 
-                new_tau = (mean1 + mean2) / 2
+                new_tau = 0.5 * (m_foreground + m_background)
 
-                if abs(tau - new_tau) < 0.5:
+                if abs(new_tau - tau) < delta_tau:
                     break
 
                 tau = new_tau
+                t += 1
 
             return tau
 
-        histogram = np.histogram(slice_data, bins=256, range=(0, 255))[0]
-        tau = calcular_isodata(histogram)
+        tau = calcular_isodata(slice_data)
 
         thresholding_image = FigureCanvasTkAgg(fig, master=thresholding_canvas)
         thresholding_image.draw()
