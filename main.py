@@ -15,6 +15,7 @@ import numpy as np
 from tkinter.ttk import *
 from skimage import filters
 import matplotlib.pyplot as pltd
+import cv2
 
 
 class GUI:
@@ -35,7 +36,7 @@ class GUI:
         self.image = None
         self.nib_image = None
         self.data = None
-        self.thresholded_image = None
+        self.segmented_image = None
 
         self.dimension = 0
         self.layer = 0
@@ -58,7 +59,7 @@ class GUI:
         segmentation_menu = tk.Menu(menu_bar, tearoff=0)
         menu_bar.add_cascade(label="Segmentación", menu=segmentation_menu)
         segmentation_menu.add_command(
-            label="Umbralización", command=self.thresholding_image
+            label="Umbralización", command=self.segmented_image
         )
         segmentation_menu.add_command(
             label="Isodata", command=self.isodata_thresholding_image
@@ -236,9 +237,9 @@ class GUI:
         def thresholding():
             try:
                 tau = float(entry_tau.get())
-                thresholded_image = slice_data > tau
-                ax.imshow(thresholded_image, cmap="gray")
-                self.thresholding_image = thresholded_image
+                segmented_image = slice_data > tau
+                ax.imshow(segmented_image, cmap="gray")
+                self.segmented_image = segmented_image
                 thresholding_image.draw()
                 ax.set_title("Umbralización con tau = {}".format(tau))
             except ValueError:
@@ -267,10 +268,10 @@ class GUI:
             tau = np.mean(image)
 
             while True:
-                thresholded_image = image > tau
+                segmented_image = image > tau
 
-                m_foreground = np.mean(image[thresholded_image])
-                m_background = np.mean(image[~thresholded_image])
+                m_foreground = np.mean(image[segmented_image])
+                m_background = np.mean(image[~segmented_image])
 
                 new_tau = 0.5 * (m_foreground + m_background)
 
@@ -288,9 +289,9 @@ class GUI:
         thresholding_image.draw()
         thresholding_image.get_tk_widget().grid(row=0, column=0)
 
-        thresholded_image = slice_data > tau
-        ax.imshow(thresholded_image, cmap="gray")
-        self.thresholding_image = thresholded_image
+        segmented_image = slice_data > tau
+        ax.imshow(segmented_image, cmap="gray")
+        self.segmented_image = segmented_image
         thresholding_image.draw()
         ax.set_title("Umbralización con tau = {}".format(tau))
 
@@ -352,8 +353,15 @@ class GUI:
         brush_size_slider.set(self.brush_size)
         brush_size_slider.grid(row=0, column=2)
 
+        def clean_drawing(ax):
+            for patch in ax.patches:
+                patch.remove()
+                circles[self.color1] = None
+                circles[self.color2] = None
+            plt.draw()
+
         clean_button = tk.Button(
-            toolbar, text="Limpiar", command=lambda: self.clean_drawing(ax)
+            toolbar, text="Limpiar", command=lambda: clean_drawing(ax)
         )
         clean_button.grid(row=0, column=3)
 
@@ -383,7 +391,8 @@ class GUI:
             brush_size = self.brush_size
 
             if circles[color]:
-                circles[color].remove()
+                if circles[color] in ax.patches:
+                    circles[color].remove()
 
             circle = plt.Circle((x, y), brush_size, color=color, fill=True)
             ax.add_patch(circle)
@@ -411,6 +420,9 @@ class GUI:
         fig.canvas.mpl_connect("motion_notify_event", on_drag)
         fig.canvas.mpl_connect("button_release_event", on_release)
 
+        def region_growth():
+            pass
+
     def kmeans_thresholding_image(self):
         pass
 
@@ -423,7 +435,7 @@ class GUI:
             filetypes=[("PNG files", "*.png"), ("All files", "*")],
         )
 
-        image = self.thresholding_image
+        image = self.segmented_image
 
         if file_path:
             plt.imsave(file_path, image, cmap="gray")

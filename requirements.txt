@@ -4,3 +4,4 @@ numpy
 nibabel
 pillow
 scikit-image
+opencv-python
