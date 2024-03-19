@@ -223,14 +223,14 @@ class GUI:
             text="Umbralizar",
             command=lambda: thresholding(),
         )
-        button_thresholding.grid(row=2, column=1)
+        button_thresholding.grid(row=2, column=0)
 
         button_save = Button(
             thresholding_canvas,
             text="Guardar imagen",
             command=lambda: self.save_image("Manual"),
         )
-        button_save.grid(row=2, column=0)
+        button_save.grid(row=3, column=0)
 
         def thresholding():
             try:
