@@ -53,6 +53,7 @@ class GUI:
         file_menu.add_command(
             label="Cargar archivo .nii por defecto", command=self.load_default_file
         )
+        file_menu.add_command(label="Salir", command=self.root.quit)
 
         segmentation_menu = tk.Menu(menu_bar, tearoff=0)
         menu_bar.add_cascade(label="Segmentación", menu=segmentation_menu)
@@ -367,6 +368,48 @@ class GUI:
             command=lambda: self.save_image("Region_growing"),
         )
         button_save.grid(row=1, column=2)
+
+        circles = {
+            self.color1: None,
+            self.color2: None,
+        }
+        active_circle = None
+
+        def on_click(event):
+            nonlocal circles, active_circle
+            x = int(event.xdata)
+            y = int(event.ydata)
+            color = self.current_color
+            brush_size = self.brush_size
+
+            if circles[color]:
+                circles[color].remove()
+
+            circle = plt.Circle((x, y), brush_size, color=color, fill=True)
+            ax.add_patch(circle)
+            circles[color] = circle
+            active_circle = circle
+            thresholding_image.draw()
+
+        def on_drag(event):
+            nonlocal circles, active_circle
+            if event.inaxes:
+                x = int(event.xdata)
+                y = int(event.ydata)
+
+                circle = active_circle
+
+                if circle:
+                    circle.center = x, y
+                    thresholding_image.draw()
+
+        def on_release(event):
+            nonlocal active_circle
+            active_circle = None
+
+        fig.canvas.mpl_connect("button_press_event", on_click)
+        fig.canvas.mpl_connect("motion_notify_event", on_drag)
+        fig.canvas.mpl_connect("button_release_event", on_release)
 
     def kmeans_thresholding_image(self):
         pass
