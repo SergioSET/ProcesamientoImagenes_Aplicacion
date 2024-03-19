@@ -366,7 +366,7 @@ class GUI:
         clean_button.grid(row=0, column=3)
 
         button_region_growth = tk.Button(
-            toolbar, text="Umbralizar", command=lambda: region_growth()
+            toolbar, text="Crecimiento de regiones", command=lambda: region_growth()
         )
         button_region_growth.grid(row=1, column=1)
 
@@ -421,7 +421,77 @@ class GUI:
         fig.canvas.mpl_connect("button_release_event", on_release)
 
         def region_growth():
-            pass
+            nonlocal circles
+            nonlocal slice_data
+            nonlocal region_growing_canvas
+            nonlocal thresholding_image
+
+            img_data = slice_data
+
+            threshold = 179
+
+            circle_coordinates = []
+            circle_colors = []
+            for color, circle in circles.items():
+                if circle:
+                    x, y = circle.center
+                    x, y = int(x), int(y)
+                    circle_coordinates.append((x, y))
+                    circle_colors.append(color)
+
+            print(circle_coordinates)
+            clean_drawing(ax)
+
+            def region_growing(img, seed_points, seed_colors, threshold):
+                # Convertir la imagen a escala de grises si es necesario
+                img_gray = img
+
+                # Obtener las dimensiones de la imagen
+                height, width = img_gray.shape
+
+                # Crear una matriz igual a la imagen pero de etiquetas inicializada en 0
+                labels = np.zeros_like(img_gray, dtype=np.int32)
+
+                # Asignar una etiqueta única a cada punto semilla de la matriz de ceros
+                label = 1
+                for seed, color in zip(seed_points, seed_colors):
+                    labels[seed] = label
+                    label += 1
+
+                    # Crecer las regiones desde los puntos semilla
+                    for seed, color in zip(seed_points, seed_colors):
+                        stack = [seed]
+                        region_label = labels[seed]  # Inicio de la región
+                        intensity_value = img_gray[
+                        seed
+                        ]  # Valor de un punto en la imagen original convertida a grices
+
+                        while stack:  # Se ejecuta hasta que stack se vacie
+                            x, y = stack.pop()
+
+                            # Comprobar los vecinos de 4 direcciones
+                            # En la primera iteración dx=0 y dy=1, en la segunda dx=0 y dy=-1 y así...
+                            for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
+                                nx, ny = x + dx, y + dy
+
+                                # Comprobar si el vecino está dentro de los límites de la imagen
+                                if 0 <= nx < height and 0 <= ny < width:
+                                    # Comprobar si el vecino no ha sido etiquetado y si su intensidad está dentro del umbral
+                                    if labels[nx, ny] == 0:
+                                        intensity_diff = abs(
+                                        int(img_gray[nx, ny]) - int(intensity_value)
+                                        )
+                                        if intensity_diff <= threshold:
+                                            # La marca como válida para la región, pasando de 0 al valor de la región
+                                            labels[nx, ny] = region_label
+                                            # Descarta el punto ya evaluado
+                                            stack.append((nx, ny))
+
+                return labels
+
+            segmented_image = region_growing(img_data, circle_coordinates, circle_colors, threshold)
+
+            ax.imshow(segmented_image)
 
     def kmeans_thresholding_image(self):
         pass
