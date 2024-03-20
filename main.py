@@ -492,6 +492,7 @@ class GUI:
                     colored_img[mask] = color
 
             segmented_image = colored_img
+            self.segmented_image = segmented_image
             ax.imshow(segmented_image)
 
     def kmeans_thresholding_image(self):
@@ -506,7 +507,7 @@ class GUI:
             filetypes=[("PNG files", "*.png"), ("All files", "*")],
         )
 
-        image = self.segmented_image
+        image = self.segmented_image.astype(np.uint8)
 
         if file_path:
             plt.imsave(file_path, image, cmap="gray")
