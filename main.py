@@ -19,6 +19,8 @@ import cv2
 import os
 import numpy as np
 import matplotlib.colors as mcolors
+import numpy as np
+from sklearn.cluster import KMeans
 
 
 class GUI:
@@ -227,7 +229,7 @@ class GUI:
             orient="horizontal",
             label="Tau",
         )
-        tau_slider.bind("<Motion>", lambda e: thresholding())
+        tau_slider.bind("<ButtonRelease-1>", lambda e: thresholding())
         tau_slider.grid(row=1, column=0)
 
         entry_tau = Entry(thresholding_canvas)
@@ -371,6 +373,7 @@ class GUI:
 
         def clean_drawing(ax):
             ax.clear()
+            ax.set_title("Crecimiento de regiones")
             ax.axis("off")
             ax.imshow(slice_data, cmap="gray")
             plt.draw()
@@ -522,7 +525,7 @@ class GUI:
         fig, ax = plt.subplots()
         ax.imshow(slice_data, cmap="gray")
         ax.axis("off")
-        ax.set_title("K-means")
+        ax.set_title("Kmeans")
         fig.tight_layout()
 
         thresholding_image = FigureCanvasTkAgg(fig, master=kmeans_canvas)
@@ -534,6 +537,7 @@ class GUI:
 
         color_button1 = tk.Button(
             toolbar,
+            text="Color 1",
             bg=self.color1,
             command=lambda: self.change_color(self.color1),
         )
@@ -541,6 +545,7 @@ class GUI:
 
         color_button2 = tk.Button(
             toolbar,
+            text="Color 2",
             bg=self.color2,
             command=lambda: self.change_color(self.color2),
         )
@@ -559,6 +564,7 @@ class GUI:
 
         def clean_drawing(ax):
             ax.clear()
+            ax.set_title("Kmeans")
             ax.axis("off")
             ax.imshow(slice_data, cmap="gray")
             plt.draw()
@@ -569,14 +575,14 @@ class GUI:
         clean_button.grid(row=0, column=3)
 
         button_region_growth = tk.Button(
-            toolbar, text="Crecimiento de regiones", command=lambda: kmeans()
+            toolbar, text="K-means", command=lambda: kmeans()
         )
         button_region_growth.grid(row=1, column=1)
 
         button_save = Button(
             toolbar,
             text="Guardar imagen",
-            command=lambda: self.save_image("Region_growing"),
+            command=lambda: self.save_image("K-means"),
         )
         button_save.grid(row=1, column=2)
 
@@ -624,7 +630,33 @@ class GUI:
         fig.canvas.mpl_connect("button_release_event", on_release)
 
         def kmeans():
-            pass
+            nonlocal circles
+
+            circle_coordinates = []
+            for color, circle in circles.items():
+                if circle:
+                    x, y = circle.center
+                    x, y = int(x), int(y)
+                    circle_coordinates.append((x, y))
+            clean_drawing(ax)
+
+            h, w = slice_data.shape
+            reshaped_data = slice_data.reshape(h * w, 1)
+
+            num_clusters = len(circle_coordinates)
+
+            kmeans = KMeans(n_clusters=num_clusters)
+            kmeans.fit(reshaped_data)
+
+            labels = kmeans.predict(reshaped_data)
+
+            labels = labels.reshape(h, w)
+
+            mask = labels == labels[0, 0]
+
+            ax.imshow(mask, cmap="gray")
+            self.segmented_image = mask
+            plt.draw()
 
     def save_image(self, method):
         file_path = filedialog.asksaveasfilename(

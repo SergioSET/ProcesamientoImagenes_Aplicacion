@@ -5,3 +5,4 @@ nibabel
 pillow
 scikit-image
 opencv-python
+scikit-learn
