@@ -218,10 +218,20 @@ class GUI:
 
         thresholding_image = FigureCanvasTkAgg(fig, master=thresholding_canvas)
         thresholding_image.draw()
-        thresholding_image.get_tk_widget().grid(row=0, column=0)
+        thresholding_image.get_tk_widget().grid(row=0, column=0, columnspan=2)
+
+        tau_slider = tk.Scale(
+            thresholding_canvas,
+            from_=0,
+            to=255,
+            orient="horizontal",
+            label="Tau",
+        )
+        tau_slider.bind("<Motion>", lambda e: thresholding())
+        tau_slider.grid(row=1, column=0)
 
         entry_tau = Entry(thresholding_canvas)
-        entry_tau.grid(row=1, column=0)
+        entry_tau.grid(row=1, column=1)
 
         button_thresholding = Button(
             thresholding_canvas,
@@ -235,11 +245,14 @@ class GUI:
             text="Guardar imagen",
             command=lambda: self.save_image("Manual"),
         )
-        button_save.grid(row=3, column=0)
+        button_save.grid(row=2, column=1)
 
-        def thresholding():
+        def thresholding(*args):
             try:
-                tau = float(entry_tau.get())
+                if entry_tau.get():
+                    tau = float(entry_tau.get())
+                else:
+                    tau = float(tau_slider.get())
                 segmented_image = slice_data > tau
                 ax.imshow(segmented_image, cmap="gray")
                 self.segmented_image = segmented_image
@@ -357,10 +370,10 @@ class GUI:
         brush_size_slider.grid(row=0, column=2)
 
         def clean_drawing(ax):
-            ax.clear() 
+            ax.clear()
             ax.axis("off")
-            ax.imshow(slice_data, cmap="gray")  
-            plt.draw()  
+            ax.imshow(slice_data, cmap="gray")
+            plt.draw()
 
         clean_button = tk.Button(
             toolbar, text="Limpiar", command=lambda: clean_drawing(ax)
@@ -496,7 +509,122 @@ class GUI:
             ax.imshow(segmented_image)
 
     def kmeans_thresholding_image(self):
-        pass
+        kmeans_canvas = Toplevel(self.root)
+        kmeans_canvas.title("K-means")
+
+        if self.dimension == 0:
+            slice_data = np.rot90(self.data[self.layer, :, :])
+        elif self.dimension == 1:
+            slice_data = np.rot90(self.data[:, self.layer, :])
+        else:
+            slice_data = np.rot90(self.data[:, :, self.layer])
+
+        fig, ax = plt.subplots()
+        ax.imshow(slice_data, cmap="gray")
+        ax.axis("off")
+        ax.set_title("K-means")
+        fig.tight_layout()
+
+        thresholding_image = FigureCanvasTkAgg(fig, master=kmeans_canvas)
+        thresholding_image.draw()
+        thresholding_image.get_tk_widget().grid(row=0, column=0)
+
+        toolbar = tk.Frame(kmeans_canvas, bg="white")
+        toolbar.grid(row=1, column=0)
+
+        color_button1 = tk.Button(
+            toolbar,
+            bg=self.color1,
+            command=lambda: self.change_color(self.color1),
+        )
+        color_button1.grid(row=0, column=0)
+
+        color_button2 = tk.Button(
+            toolbar,
+            bg=self.color2,
+            command=lambda: self.change_color(self.color2),
+        )
+        color_button2.grid(row=0, column=1)
+
+        brush_size_slider = tk.Scale(
+            toolbar,
+            from_=1,
+            to=10,
+            orient="horizontal",
+            label="Tamaño del pincel",
+            command=self.change_brush_size,
+        )
+        brush_size_slider.set(self.brush_size)
+        brush_size_slider.grid(row=0, column=2)
+
+        def clean_drawing(ax):
+            ax.clear()
+            ax.axis("off")
+            ax.imshow(slice_data, cmap="gray")
+            plt.draw()
+
+        clean_button = tk.Button(
+            toolbar, text="Limpiar", command=lambda: clean_drawing(ax)
+        )
+        clean_button.grid(row=0, column=3)
+
+        button_region_growth = tk.Button(
+            toolbar, text="Crecimiento de regiones", command=lambda: kmeans()
+        )
+        button_region_growth.grid(row=1, column=1)
+
+        button_save = Button(
+            toolbar,
+            text="Guardar imagen",
+            command=lambda: self.save_image("Region_growing"),
+        )
+        button_save.grid(row=1, column=2)
+
+        circles = {
+            self.color1: None,
+            self.color2: None,
+        }
+        active_circle = None
+
+        def on_click(event):
+            nonlocal circles, active_circle
+            x = int(event.xdata)
+            y = int(event.ydata)
+            color = self.current_color
+            brush_size = self.brush_size
+
+            if circles[color]:
+                if circles[color] in ax.patches:
+                    circles[color].remove()
+
+            circle = plt.Circle((x, y), brush_size, color=color, fill=True)
+            ax.add_patch(circle)
+            circles[color] = circle
+            active_circle = circle
+            thresholding_image.draw()
+
+        def on_drag(event):
+            nonlocal circles, active_circle
+            if event.inaxes:
+                x = int(event.xdata)
+                y = int(event.ydata)
+
+                circle = active_circle
+
+                if circle:
+                    circle.center = x, y
+                    thresholding_image.draw()
+
+        def on_release(event):
+            nonlocal active_circle
+            active_circle = None
+
+        fig.canvas.mpl_connect("button_press_event", on_click)
+        fig.canvas.mpl_connect("motion_notify_event", on_drag)
+        fig.canvas.mpl_connect("button_release_event", on_release)
+
+        def kmeans():
+            pass
 
     def save_image(self, method):
         file_path = filedialog.asksaveasfilename(
