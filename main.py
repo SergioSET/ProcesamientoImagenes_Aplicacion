@@ -16,6 +16,9 @@ from tkinter.ttk import *
 from skimage import filters
 import matplotlib.pyplot as pltd
 import cv2
+import os
+import numpy as np
+import matplotlib.colors as mcolors
 
 
 class GUI:
@@ -59,7 +62,7 @@ class GUI:
         segmentation_menu = tk.Menu(menu_bar, tearoff=0)
         menu_bar.add_cascade(label="Segmentación", menu=segmentation_menu)
         segmentation_menu.add_command(
-            label="Umbralización", command=self.segmented_image
+            label="Umbralización", command=self.thresholding_image
         )
         segmentation_menu.add_command(
             label="Isodata", command=self.isodata_thresholding_image
@@ -354,11 +357,10 @@ class GUI:
         brush_size_slider.grid(row=0, column=2)
 
         def clean_drawing(ax):
-            for patch in ax.patches:
-                patch.remove()
-                circles[self.color1] = None
-                circles[self.color2] = None
-            plt.draw()
+            ax.clear() 
+            ax.axis("off")
+            ax.imshow(slice_data, cmap="gray")  
+            plt.draw()  
 
         clean_button = tk.Button(
             toolbar, text="Limpiar", command=lambda: clean_drawing(ax)
@@ -428,69 +430,68 @@ class GUI:
 
             img_data = slice_data
 
-            threshold = 179
+            threshold = 30
 
             circle_coordinates = []
-            circle_colors = []
+            colors = []
             for color, circle in circles.items():
                 if circle:
                     x, y = circle.center
                     x, y = int(x), int(y)
                     circle_coordinates.append((x, y))
-                    circle_colors.append(color)
-
-            print(circle_coordinates)
+                    colors.append(color)
             clean_drawing(ax)
 
-            def region_growing(img, seed_points, seed_colors, threshold):
-                # Convertir la imagen a escala de grises si es necesario
-                img_gray = img
+            def region_growing(image, seed_points, threshold):
 
-                # Obtener las dimensiones de la imagen
+                img_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
                 height, width = img_gray.shape
 
-                # Crear una matriz igual a la imagen pero de etiquetas inicializada en 0
                 labels = np.zeros_like(img_gray, dtype=np.int32)
 
-                # Asignar una etiqueta única a cada punto semilla de la matriz de ceros
                 label = 1
-                for seed, color in zip(seed_points, seed_colors):
+                for seed in seed_points:
                     labels[seed] = label
                     label += 1
 
-                    # Crecer las regiones desde los puntos semilla
-                    for seed, color in zip(seed_points, seed_colors):
-                        stack = [seed]
-                        region_label = labels[seed]  # Inicio de la región
-                        intensity_value = img_gray[
-                        seed
-                        ]  # Valor de un punto en la imagen original convertida a grices
+                for seed in seed_points:
+                    stack = [seed]
+                    region_label = labels[seed]
+                    intensity_value = img_gray[seed]
 
-                        while stack:  # Se ejecuta hasta que stack se vacie
-                            x, y = stack.pop()
+                    while stack:
+                        x, y = stack.pop()
 
-                            # Comprobar los vecinos de 4 direcciones
-                            # En la primera iteración dx=0 y dy=1, en la segunda dx=0 y dy=-1 y así...
-                            for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
-                                nx, ny = x + dx, y + dy
+                        for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
+                            nx, ny = x + dx, y + dy
 
-                                # Comprobar si el vecino está dentro de los límites de la imagen
-                                if 0 <= nx < height and 0 <= ny < width:
-                                    # Comprobar si el vecino no ha sido etiquetado y si su intensidad está dentro del umbral
-                                    if labels[nx, ny] == 0:
-                                        intensity_diff = abs(
+                            if 0 <= nx < height and 0 <= ny < width:
+                                if labels[nx, ny] == 0:
+                                    intensity_diff = abs(
                                         int(img_gray[nx, ny]) - int(intensity_value)
-                                        )
-                                        if intensity_diff <= threshold:
-                                            # La marca como válida para la región, pasando de 0 al valor de la región
-                                            labels[nx, ny] = region_label
-                                            # Descarta el punto ya evaluado
-                                            stack.append((nx, ny))
+                                    )
+                                    if intensity_diff <= threshold:
+                                        labels[nx, ny] = region_label
+                                        stack.append((nx, ny))
 
                 return labels
 
-            segmented_image = region_growing(img_data, circle_coordinates, circle_colors, threshold)
+            plt.imsave("imagenes/imagen.png", img_data, cmap="gray")
+            img = cv2.imread("imagenes/imagen.png")
 
+            segmented_image = region_growing(img, circle_coordinates, threshold)
+
+            colored_img = np.zeros_like(img, dtype=np.int32)
+            unique_labels = np.unique(segmented_image)
+            color_dict = {"red": np.array([255, 0, 0]), "green": np.array([0, 255, 0])}
+            for label in unique_labels:
+                if label != 0:
+                    mask = segmented_image == label
+                    color = color_dict[colors[label - 1]]
+                    colored_img[mask] = color
+
+            segmented_image = colored_img
             ax.imshow(segmented_image)
 
     def kmeans_thresholding_image(self):
