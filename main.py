@@ -12,22 +12,14 @@ from sklearn.cluster import KMeans
 class GUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("Procesamiento de imágenes")
+        self.root.title("Procesamiento de imágenes médicas")
         self.root.geometry("800x600")
 
         self.file_path = None
-        self.file_shape = None
 
-        self.color1 = "red"
-        self.color2 = "green"
-        self.current_color = self.color1
-        self.brush_size = 3
-        self.drawing_objects = []
-
-        self.image = None
-        self.nib_image = None
+        self.slice_data = None
         self.data = None
-        self.segmented_image = None
+        self.segmented_data = None
 
         self.dimension = 0
         self.layer = 0
@@ -50,25 +42,21 @@ class GUI:
         segmentation_menu = tk.Menu(menu_bar, tearoff=0)
         menu_bar.add_cascade(label="Segmentación", menu=segmentation_menu)
         segmentation_menu.add_command(
-            label="Umbralización", command=self.thresholding_image
+            label="Umbralización manual", command=self.thresholding_image
         )
-        segmentation_menu.add_command(
-            label="Isodata", command=self.isodata_thresholding_image
-        )
-        segmentation_menu.add_command(
-            label="Crecimiento de regiones",
-            command=self.region_growing_image,
-        )
-        segmentation_menu.add_command(
-            label="K-means", command=self.kmeans_thresholding_image
-        )
-
-        help_menu = tk.Menu(menu_bar, tearoff=0)
-        menu_bar.add_cascade(label="Ayuda", menu=help_menu)
-        help_menu.add_command(label="Acerca de", command=self.show_about)
+        # segmentation_menu.add_command(
+        #     label="Umbralización Isodata", command=self.isodata_thresholding_image
+        # )
+        # segmentation_menu.add_command(
+        #     label="Crecimiento de regiones",
+        #     command=self.region_growing_image,
+        # )
+        # segmentation_menu.add_command(
+        #     label="K-means", command=self.kmeans_thresholding_image
+        # )
 
     def setup_toolbar(self):
-        toolbar = tk.Frame(self.root, bg="white")
+        toolbar = tk.Frame(self.root)
         toolbar.pack(side="bottom")
 
         self.combobox = ttk.Combobox(
@@ -78,7 +66,7 @@ class GUI:
         )
         self.combobox.grid(row=0, column=0)
         self.combobox.current(0)
-        self.combobox.bind("<<ComboboxSelected>>", self.show_combobox_slider)
+        self.combobox.bind("<<ComboboxSelected>>", self.show_toolbar)
         self.combobox.grid_remove()
 
         self.layer_slider = tk.Scale(
@@ -86,20 +74,19 @@ class GUI:
             from_=0,
             to=0,
             orient="horizontal",
-            label="Capa",
             command=self.update_image,
         )
-        self.layer_slider.grid(row=0, column=1)
+        self.layer_slider.grid(row=1, column=0)
         self.layer_slider.grid_remove()
 
         self.layer_entry = tk.Entry(toolbar)
-        self.layer_entry.grid(row=0, column=2)
+        self.layer_entry.grid(row=0, column=1)
         self.layer_entry.grid_remove()
 
         self.apply_layer_button = tk.Button(
             toolbar, text="Aplicar", command=self.apply_layer_value
         )
-        self.apply_layer_button.grid(row=0, column=3)
+        self.apply_layer_button.grid(row=1, column=1)
         self.apply_layer_button.grid_remove()
 
     def open_file(self):
@@ -109,23 +96,32 @@ class GUI:
 
         if file_path:
             self.file_path = file_path
-            self.nib_image = nib.load(file_path)
-            self.data = self.nib_image.get_fdata()
-            self.file_shape = self.data.shape
-            self.show_combobox_slider()
+            self.data = nib.load(self.file_path).get_fdata()
+            self.show_toolbar()
 
     def load_default_file(self):
         self.file_path = "sub-01_T1w.nii"
-        self.nib_image = nib.load(self.file_path)
-        self.data = self.nib_image.get_fdata()
-        self.file_shape = self.data.shape
-        self.show_combobox_slider()
+        self.data = nib.load(self.file_path).get_fdata()
+        self.show_toolbar()
 
-    def change_color(self, color):
-        self.current_color = color
+    def show_toolbar(self):
+        dimensions = len(self.data.shape)
 
-    def change_brush_size(self, size):
-        self.brush_size = int(size)
+        self.combobox["values"] = [f"Dimensión {i+1}" for i in range(dimensions)]
+        self.combobox.grid()
+
+        self.layer_slider["to"] = self.data.shape[self.combobox.current()] - 1
+        self.layer_slider.set(0)
+        self.layer_slider.grid()
+
+        self.layer_entry.grid()
+
+        self.apply_layer_button.grid()
+
+        self.dimension = self.combobox.current()
+        self.layer = int(self.layer_slider.get())
+
+        self.update_image()
 
     def apply_layer_value(self):
         try:
@@ -140,39 +136,23 @@ class GUI:
             self.layer_entry.insert(0, self.layer_slider.get())
         self.update_image()
 
-    def show_combobox_slider(self, *args):
-        dimensions = len(self.data.shape)
-
-        self.combobox["values"] = [f"Dimensión {i+1}" for i in range(dimensions)]
-        self.combobox.grid()
-
-        self.layer_slider["to"] = self.file_shape[self.combobox.current()] - 1
-        self.layer_slider.set(0)
-        self.layer_slider.grid()
-
-        self.layer_entry.grid()
-
-        self.apply_layer_button.grid()
-
-        self.update_image()
-
     def update_image(self, *args):
         self.dimension = self.combobox.current()
         self.layer = self.layer_slider.get()
 
         if self.dimension == 0:
-            slice_data = np.rot90(self.data[self.layer, :, :])
+            self.slice_data = np.rot90(self.data[self.layer, :, :])
         elif self.dimension == 1:
-            slice_data = np.rot90(self.data[:, self.layer, :])
+            self.slice_data = np.rot90(self.data[:, self.layer, :])
         else:
-            slice_data = np.rot90(self.data[:, :, self.layer])
+            self.slice_data = np.rot90(self.data[:, :, self.layer])
 
         if not hasattr(self, "fig"):
             self.fig = plt.figure(figsize=(6, 6))
             self.ax = self.fig.add_subplot(111)
 
         self.ax.clear()
-        self.ax.imshow(slice_data, cmap="gray")
+        self.ax.imshow(self.slice_data, cmap="gray")
         self.ax.set_xlabel("X")
         self.ax.set_ylabel("Y")
         self.ax.axis("off")
@@ -189,478 +169,140 @@ class GUI:
 
     def thresholding_image(self):
         thresholding_canvas = Toplevel(self.root)
-        thresholding_canvas.title("Umbralización")
+        thresholding_canvas.title("Umbralización manual")
+        thresholding_toolbar = tk.Frame(thresholding_canvas)
+        thresholding_toolbar.grid(row=0, column=0, columnspan=2)
 
-        if self.dimension == 0:
-            slice_data = np.rot90(self.data[self.layer, :, :])
-        elif self.dimension == 1:
-            slice_data = np.rot90(self.data[:, self.layer, :])
-        else:
-            slice_data = np.rot90(self.data[:, :, self.layer])
+        dimension = self.combobox.current()
+        layer = self.layer_slider.get()
+        thresholded = False
 
         fig, ax = plt.subplots()
-        ax.imshow(slice_data, cmap="gray")
+        ax.imshow(self.slice_data, cmap="gray")
         ax.axis("off")
-        ax.set_title("Umbralización")
+        ax.set_title("Umbralización manual")
         fig.tight_layout()
 
         thresholding_image = FigureCanvasTkAgg(fig, master=thresholding_canvas)
+        thresholding_image.get_tk_widget().grid(row=1, column=0, columnspan=2)
         thresholding_image.draw()
-        thresholding_image.get_tk_widget().grid(row=0, column=0, columnspan=2)
+
+        def update_image(*args):
+            dimension = combobox.current()
+            layer = layer_slider.get()
+
+            if thresholded == True:
+                data = self.segmented_data
+            else:
+                data = self.data
+
+            if dimension == 0:
+                slice_data = np.rot90(data[layer, :, :])
+            elif dimension == 1:
+                slice_data = np.rot90(data[:, layer, :])
+            else:
+                slice_data = np.rot90(data[:, :, layer])
+
+            ax.clear()
+            ax.imshow(slice_data, cmap="gray")
+            ax.axis("off")
+            ax.set_title("Umbralización manual")
+            fig.tight_layout()
+            thresholding_image.draw()
+
+        combobox = ttk.Combobox(
+            thresholding_toolbar,
+            values=[f"Dimensión {i+1}" for i in range(len(self.data.shape))],
+            state="readonly",
+        )
+        combobox.grid(row=0, column=0)
+        combobox.current(self.combobox.current())
+        combobox.bind("<<ComboboxSelected>>", update_image)
+
+        layer_slider = tk.Scale(
+            thresholding_toolbar,
+            from_=0,
+            to=self.data.shape[combobox.current()] - 1,
+            orient="horizontal",
+            command=update_image,
+        )
+        layer_slider.set(self.layer_slider.get())
+        layer_slider.grid(row=1, column=0)
+
+        layer_entry = tk.Entry(thresholding_toolbar)
+        layer_entry.grid(row=0, column=1)
+
+        def apply_layer_value():
+            try:
+                value = int(layer_entry.get())
+                if 0 <= value <= layer_slider["to"]:
+                    layer_slider.set(value)
+                else:
+                    layer_entry.delete(0, "end")
+                    layer_entry.insert(0, int(layer_slider["to"]))
+            except ValueError:
+                layer_entry.delete(0, "end")
+                layer_entry.insert(0, layer_slider.get())
+            update_image()
+
+        apply_layer_button = tk.Button(
+            thresholding_toolbar, text="Aplicar", command=apply_layer_value
+        )
+        apply_layer_button.grid(row=1, column=1)
 
         tau_slider = tk.Scale(
             thresholding_canvas,
             from_=0,
             to=255,
             orient="horizontal",
-            label="Tau",
         )
-        tau_slider.bind("<ButtonRelease-1>", lambda e: thresholding())
-        tau_slider.grid(row=1, column=0)
+        tau_slider.grid(row=2, column=0)
 
-        entry_tau = Entry(thresholding_canvas)
-        entry_tau.grid(row=1, column=1)
+        entry_tau = tk.Entry(thresholding_canvas)
+        entry_tau.grid(row=2, column=1)
 
-        button_thresholding = Button(
+        button_threshold = tk.Button(
             thresholding_canvas,
             text="Umbralizar",
-            command=lambda: thresholding(),
+            command=lambda: threshold_image(fig, ax),
         )
-        button_thresholding.grid(row=2, column=0)
+        button_threshold.grid(row=3, column=1)
 
-        button_save = Button(
+        button_save = tk.Button(
             thresholding_canvas,
-            text="Guardar imagen",
-            command=lambda: self.save_image("Manual"),
+            text="Guardar archivo nii",
+            command=lambda: self.save_nii("Manual", fig),
         )
-        button_save.grid(row=2, column=1)
+        button_save.grid(row=3, column=0)
 
-        def thresholding(*args):
-            try:
-                if entry_tau.get():
-                    tau = float(entry_tau.get())
-                else:
-                    tau = float(tau_slider.get())
-                segmented_image = slice_data > tau
-                ax.imshow(segmented_image, cmap="gray")
-                self.segmented_image = segmented_image
-                thresholding_image.draw()
-                ax.set_title("Umbralización con tau = {}".format(tau))
-            except ValueError:
-                messagebox.showerror("Error", "Por favor, ingrese un valor numérico")
+        def threshold_image(fig, ax):
+            nonlocal thresholded
+            thresholded = True
+            tau = tau_slider.get()
+            self.segmented_data = np.where(self.data > tau, 255, 0)
+            update_image()
+            print("Thresholded")
 
     def isodata_thresholding_image(self):
-        thresholding_canvas = Toplevel(self.root)
-        thresholding_canvas.title("Isodata")
-
-        if self.dimension == 0:
-            slice_data = np.rot90(self.data[self.layer, :, :])
-        elif self.dimension == 1:
-            slice_data = np.rot90(self.data[:, self.layer, :])
-        else:
-            slice_data = np.rot90(self.data[:, :, self.layer])
-
-        fig, ax = plt.subplots()
-        ax.imshow(slice_data, cmap="gray")
-        ax.axis("off")
-        ax.set_title("Isodata")
-        fig.tight_layout()
-
-        def calcular_isodata(image):
-            t = 0
-            delta_tau = 1
-            tau = np.mean(image)
-
-            while True:
-                segmented_image = image > tau
-
-                m_foreground = np.mean(image[segmented_image])
-                m_background = np.mean(image[~segmented_image])
-
-                new_tau = 0.5 * (m_foreground + m_background)
-
-                if abs(new_tau - tau) < delta_tau:
-                    break
-
-                tau = new_tau
-                t += 1
-
-            return tau
-
-        tau = calcular_isodata(slice_data)
-
-        thresholding_image = FigureCanvasTkAgg(fig, master=thresholding_canvas)
-        thresholding_image.draw()
-        thresholding_image.get_tk_widget().grid(row=0, column=0)
-
-        segmented_image = slice_data > tau
-        ax.imshow(segmented_image, cmap="gray")
-        self.segmented_image = segmented_image
-        thresholding_image.draw()
-        ax.set_title("Umbralización con tau = {}".format(tau))
-
-        button_save = Button(
-            thresholding_canvas,
-            text="Guardar imagen",
-            command=lambda: self.save_image("Isodata"),
-        )
-        button_save.grid(row=2, column=0)
+        pass
 
     def region_growing_image(self):
-        region_growing_canvas = Toplevel(self.root)
-        region_growing_canvas.title("Crecimiento de regiones")
-
-        if self.dimension == 0:
-            slice_data = np.rot90(self.data[self.layer, :, :])
-        elif self.dimension == 1:
-            slice_data = np.rot90(self.data[:, self.layer, :])
-        else:
-            slice_data = np.rot90(self.data[:, :, self.layer])
-
-        fig, ax = plt.subplots()
-        ax.imshow(slice_data, cmap="gray")
-        ax.axis("off")
-        ax.set_title("Crecimiento de regiones")
-        fig.tight_layout()
-
-        thresholding_image = FigureCanvasTkAgg(fig, master=region_growing_canvas)
-        thresholding_image.draw()
-        thresholding_image.get_tk_widget().grid(row=0, column=0)
-
-        toolbar = tk.Frame(region_growing_canvas, bg="white")
-        toolbar.grid(row=1, column=0)
-
-        color_button1 = tk.Button(
-            toolbar,
-            text="Color 1",
-            bg=self.color1,
-            command=lambda: self.change_color(self.color1),
-        )
-        color_button1.grid(row=0, column=0)
-
-        color_button2 = tk.Button(
-            toolbar,
-            text="Color 2",
-            bg=self.color2,
-            command=lambda: self.change_color(self.color2),
-        )
-        color_button2.grid(row=0, column=1)
-
-        brush_size_slider = tk.Scale(
-            toolbar,
-            from_=1,
-            to=10,
-            orient="horizontal",
-            label="Tamaño del pincel",
-            command=self.change_brush_size,
-        )
-        brush_size_slider.set(self.brush_size)
-        brush_size_slider.grid(row=0, column=2)
-
-        def clean_drawing(ax):
-            ax.clear()
-            ax.set_title("Crecimiento de regiones")
-            ax.axis("off")
-            ax.imshow(slice_data, cmap="gray")
-            plt.draw()
-
-        clean_button = tk.Button(
-            toolbar, text="Limpiar", command=lambda: clean_drawing(ax)
-        )
-        clean_button.grid(row=0, column=3)
-
-        button_region_growth = tk.Button(
-            toolbar, text="Crecimiento de regiones", command=lambda: region_growth()
-        )
-        button_region_growth.grid(row=1, column=1)
-
-        button_save = Button(
-            toolbar,
-            text="Guardar imagen",
-            command=lambda: self.save_image("Region_growing"),
-        )
-        button_save.grid(row=1, column=2)
-
-        circles = {
-            self.color1: None,
-            self.color2: None,
-        }
-        active_circle = None
-
-        def on_click(event):
-            nonlocal circles, active_circle
-            x = int(event.xdata)
-            y = int(event.ydata)
-            color = self.current_color
-            brush_size = self.brush_size
-
-            if circles[color]:
-                if circles[color] in ax.patches:
-                    circles[color].remove()
-
-            circle = plt.Circle((x, y), brush_size, color=color, fill=True)
-            ax.add_patch(circle)
-            circles[color] = circle
-            active_circle = circle
-            thresholding_image.draw()
-
-        def on_drag(event):
-            nonlocal circles, active_circle
-            if event.inaxes:
-                x = int(event.xdata)
-                y = int(event.ydata)
-
-                circle = active_circle
-
-                if circle:
-                    circle.center = x, y
-                    thresholding_image.draw()
-
-        def on_release(event):
-            nonlocal active_circle
-            active_circle = None
-
-        fig.canvas.mpl_connect("button_press_event", on_click)
-        fig.canvas.mpl_connect("motion_notify_event", on_drag)
-        fig.canvas.mpl_connect("button_release_event", on_release)
-
-        def region_growth():
-            nonlocal circles
-            nonlocal slice_data
-            nonlocal region_growing_canvas
-            nonlocal thresholding_image
-
-            img_data = slice_data
-
-            threshold = 30
-
-            circle_coordinates = []
-            colors = []
-            for color, circle in circles.items():
-                if circle:
-                    x, y = circle.center
-                    x, y = int(x), int(y)
-                    circle_coordinates.append((x, y))
-                    colors.append(color)
-            clean_drawing(ax)
-
-            def region_growing(image, seed_points, threshold):
-
-                img_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-
-                height, width = img_gray.shape
-
-                labels = np.zeros_like(img_gray, dtype=np.int32)
-
-                label = 1
-                for seed in seed_points:
-                    labels[seed] = label
-                    label += 1
-
-                for seed in seed_points:
-                    stack = [seed]
-                    region_label = labels[seed]
-                    intensity_value = img_gray[seed]
-
-                    while stack:
-                        x, y = stack.pop()
-
-                        for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
-                            nx, ny = x + dx, y + dy
-
-                            if 0 <= nx < height and 0 <= ny < width:
-                                if labels[nx, ny] == 0:
-                                    intensity_diff = abs(
-                                        int(img_gray[nx, ny]) - int(intensity_value)
-                                    )
-                                    if intensity_diff <= threshold:
-                                        labels[nx, ny] = region_label
-                                        stack.append((nx, ny))
-
-                return labels
-
-            plt.imsave("imagenes/imagen.png", img_data, cmap="gray")
-            img = cv2.imread("imagenes/imagen.png")
-
-            segmented_image = region_growing(img, circle_coordinates, threshold)
-
-            colored_img = np.zeros_like(img, dtype=np.int32)
-            unique_labels = np.unique(segmented_image)
-            color_dict = {"red": np.array([255, 0, 0]), "green": np.array([0, 255, 0])}
-            for label in unique_labels:
-                if label != 0:
-                    mask = segmented_image == label
-                    color = color_dict[colors[label - 1]]
-                    colored_img[mask] = color
-
-            segmented_image = colored_img
-            self.segmented_image = segmented_image
-            ax.imshow(segmented_image)
+        pass
 
     def kmeans_thresholding_image(self):
-        kmeans_canvas = Toplevel(self.root)
-        kmeans_canvas.title("K-means")
+        pass
 
-        if self.dimension == 0:
-            slice_data = np.rot90(self.data[self.layer, :, :])
-        elif self.dimension == 1:
-            slice_data = np.rot90(self.data[:, self.layer, :])
-        else:
-            slice_data = np.rot90(self.data[:, :, self.layer])
-
-        fig, ax = plt.subplots()
-        ax.imshow(slice_data, cmap="gray")
-        ax.axis("off")
-        ax.set_title("Kmeans")
-        fig.tight_layout()
-
-        thresholding_image = FigureCanvasTkAgg(fig, master=kmeans_canvas)
-        thresholding_image.draw()
-        thresholding_image.get_tk_widget().grid(row=0, column=0)
-
-        toolbar = tk.Frame(kmeans_canvas, bg="white")
-        toolbar.grid(row=1, column=0)
-
-        color_button1 = tk.Button(
-            toolbar,
-            text="Color 1",
-            bg=self.color1,
-            command=lambda: self.change_color(self.color1),
-        )
-        color_button1.grid(row=0, column=0)
-
-        color_button2 = tk.Button(
-            toolbar,
-            text="Color 2",
-            bg=self.color2,
-            command=lambda: self.change_color(self.color2),
-        )
-        color_button2.grid(row=0, column=1)
-
-        brush_size_slider = tk.Scale(
-            toolbar,
-            from_=1,
-            to=10,
-            orient="horizontal",
-            label="Tamaño del pincel",
-            command=self.change_brush_size,
-        )
-        brush_size_slider.set(self.brush_size)
-        brush_size_slider.grid(row=0, column=2)
-
-        def clean_drawing(ax):
-            ax.clear()
-            ax.set_title("Kmeans")
-            ax.axis("off")
-            ax.imshow(slice_data, cmap="gray")
-            plt.draw()
-
-        clean_button = tk.Button(
-            toolbar, text="Limpiar", command=lambda: clean_drawing(ax)
-        )
-        clean_button.grid(row=0, column=3)
-
-        button_kmeans = tk.Button(toolbar, text="K-means", command=lambda: kmeans())
-        button_kmeans.grid(row=1, column=1)
-
-        button_save = Button(
-            toolbar,
-            text="Guardar imagen",
-            command=lambda: self.save_image("K-means"),
-        )
-        button_save.grid(row=1, column=2)
-
-        circles = {
-            self.color1: None,
-            self.color2: None,
-        }
-        active_circle = None
-
-        def on_click(event):
-            nonlocal circles, active_circle
-            x = int(event.xdata)
-            y = int(event.ydata)
-            color = self.current_color
-            brush_size = self.brush_size
-
-            if circles[color]:
-                if circles[color] in ax.patches:
-                    circles[color].remove()
-
-            circle = plt.Circle((x, y), brush_size, color=color, fill=True)
-            ax.add_patch(circle)
-            circles[color] = circle
-            active_circle = circle
-            thresholding_image.draw()
-
-        def on_drag(event):
-            nonlocal circles, active_circle
-            if event.inaxes:
-                x = int(event.xdata)
-                y = int(event.ydata)
-
-                circle = active_circle
-
-                if circle:
-                    circle.center = x, y
-                    thresholding_image.draw()
-
-        def on_release(event):
-            nonlocal active_circle
-            active_circle = None
-
-        fig.canvas.mpl_connect("button_press_event", on_click)
-        fig.canvas.mpl_connect("motion_notify_event", on_drag)
-        fig.canvas.mpl_connect("button_release_event", on_release)
-
-        def kmeans():
-            nonlocal circles
-
-            circle_coordinates = []
-            for color, circle in circles.items():
-                if circle:
-                    x, y = circle.center
-                    x, y = int(x), int(y)
-                    circle_coordinates.append((x, y))
-            clean_drawing(ax)
-
-            h, w = slice_data.shape
-            reshaped_data = slice_data.reshape(h * w, 1)
-
-            num_clusters = len(circle_coordinates)
-
-            kmeans = KMeans(n_clusters=num_clusters)
-            kmeans.fit(reshaped_data)
-
-            labels = kmeans.predict(reshaped_data)
-
-            labels = labels.reshape(h, w)
-
-            mask = labels == labels[0, 0]
-
-            ax.imshow(mask, cmap="gray")
-            self.segmented_image = mask
-            plt.draw()
-
-    def save_image(self, method):
+    def save_nii(self, method, fig):
         file_path = filedialog.asksaveasfilename(
-            defaultextension=".png",
-            initialfile="Dimension_{}_Layer_{}_{}".format(
-                self.dimension + 1, self.layer, method
-            ),
-            filetypes=[("PNG files", "*.png"), ("All files", "*")],
+            filetypes=[("NIfTI files", "*.nii"), ("All files", "*")]
         )
-
-        image = self.segmented_image.astype(np.uint8)
 
         if file_path:
-            plt.imsave(file_path, image, cmap="gray")
-
-    def show_about(self):
-        messagebox.showinfo(
-            "Acerca de",
-            "Esta aplicación fue desarrollada por el grupo 1 de la materia de Procesamiento de Imágenes Médicas",
-        )
+            nib.save(nib.Nifti1Image(self.segmented_data, np.eye(4)), file_path)
+            messagebox.showinfo(
+                "Archivo guardado",
+                f"El archivo ha sido guardado con el método de segmentación {method}",
+            )
 
 
 root = tk.Tk()
