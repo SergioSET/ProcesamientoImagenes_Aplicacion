@@ -1,25 +1,11 @@
 import tkinter as tk
-from tkinter import filedialog, ttk
-import nibabel as nib
+from tkinter import filedialog, messagebox, ttk, Toplevel
 from tkinter.ttk import *
-import matplotlib.pyplot as plt
-import tkinter as tk
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.pyplot as plt
-import nibabel as nib
-import tkinter as tk
-from tkinter import Toplevel, filedialog, messagebox, ttk
-from PIL import Image, ImageTk
-import nibabel as nib
 import numpy as np
-from tkinter.ttk import *
-from skimage import filters
-import matplotlib.pyplot as pltd
+import nibabel as nib
 import cv2
-import os
-import numpy as np
-import matplotlib.colors as mcolors
-import numpy as np
 from sklearn.cluster import KMeans
 
 
@@ -574,10 +560,8 @@ class GUI:
         )
         clean_button.grid(row=0, column=3)
 
-        button_region_growth = tk.Button(
-            toolbar, text="K-means", command=lambda: kmeans()
-        )
-        button_region_growth.grid(row=1, column=1)
+        button_kmeans = tk.Button(toolbar, text="K-means", command=lambda: kmeans())
+        button_kmeans.grid(row=1, column=1)
 
         button_save = Button(
             toolbar,
