@@ -27,7 +27,7 @@ class GUI(customtkinter.CTk):
         self.data = None
         self.segmented_image = None
 
-        self.dimension = 0
+        self.dimension = 1
         self.layer = 0
 
         self.color1 = "red"
@@ -97,6 +97,7 @@ class GUI(customtkinter.CTk):
         self.brush_size_slider.set(3)
         self.brush_size_slider.grid(row=8, column=0, padx=20, pady=10)
 
+        self.update_dimension()
 
         # self.appearance_mode_label = customtkinter.CTkLabel(self.sidebar_frame, text="Appearance Mode:", anchor="w")
         # self.appearance_mode_label.grid(row=5, column=0, padx=20, pady=(10, 0))
