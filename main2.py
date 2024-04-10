@@ -1,3 +1,4 @@
+from PIL import Image
 import tkinter
 import tkinter.messagebox
 import customtkinter
@@ -87,7 +88,7 @@ class GUI(customtkinter.CTk):
 
         self.umbralizacion_label = customtkinter.CTkLabel(self.sidebar_frame, text="Segmentación", font=customtkinter.CTkFont(size=20, weight="bold"))
         self.umbralizacion_label.grid(row=4, column=0, padx=20, pady=(20, 10))
-        self.umbralizacion_select = customtkinter.CTkOptionMenu(self.sidebar_frame, state="disabled", values=["No seleccionado", "Umbralización", "Isodata", "Crecimiento de regiones", "K-means"])
+        self.umbralizacion_select = customtkinter.CTkOptionMenu(self.sidebar_frame, state="disabled", values=["No seleccionado", "Umbralización", "Isodata", "Crecimiento de regiones", "K-means"], command=self.thresholding_menu)
         self.umbralizacion_select.grid(row=5, column=0, padx=20, pady=10)
 
         self.color_select = customtkinter.CTkOptionMenu(self.sidebar_frame, state="disabled", values=self.colors[1], command=self.update_color)
@@ -157,15 +158,7 @@ class GUI(customtkinter.CTk):
 
         if self.dimension in self.drawn_objects_dict and self.layer in self.drawn_objects_dict[self.dimension]:
             for drawn_object in self.drawn_objects_dict[self.dimension][self.layer]:
-                if isinstance(drawn_object, matplotlib.patches.Circle):
-                    x, y = drawn_object.center
-                    radius = drawn_object.radius
-                    brush_size = self.brush_size
-                    x_min = max(x - radius, 0)
-                    x_max = min(x + radius, slice_data.shape[1] - 1)
-                    y_min = max(y - radius, 0)
-                    y_max = min(y + radius, slice_data.shape[0] - 1)
-                    slice_data[y_min:y_max+1, x_min:x_max+1] = numpy.where(numpy.sqrt((numpy.arange(y_min, y_max+1) - y)**2 + (numpy.arange(x_min, x_max+1) - x)**2) <= brush_size, self.colors[0].index(self.current_color), slice_data[y_min:y_max+1, x_min:x_max+1])
+                self.ax.add_patch(drawn_object)
 
         self.ax.imshow(slice_data, cmap="gray")
         self.ax.set_xlabel("X")
@@ -215,9 +208,24 @@ class GUI(customtkinter.CTk):
             self.ax.add_patch(circle)
             self.canvas.draw()
 
+            # if self.dimension == 0:
+            #     modified_layer = numpy.array(self.ax.figure.canvas.renderer.buffer_rgba())
+                
+            #     modified_image_gray = modified_layer[:, :]
+            #     pil_image = Image.fromarray(modified_image_gray)
+
+
+            #     resized_image = pil_image.resize((192, 192))
+            #     self.modified_data[self.layer, :, :] = resized_image
+            # elif self.dimension == 1:
+            #     self.modified_data[:, self.layer, :]
+            # else:
+            #     self.modified_data[:, :, self.layer]
+
+            self.update_image()
+
     def clear_draws(self):
         self.drawn_objects_dict[self.dimension][self.layer] = []
-        super().clear_draws()
 
     def restore_file(self):
         self.modified_data = self.data
@@ -225,9 +233,35 @@ class GUI(customtkinter.CTk):
         self.update_image()
 
     def save_file(self):
-        self.modified_data = self.modified_data[:,:,88] = 0
         modified_img = nibabel.Nifti1Image(self.modified_data, self.nib_image.affine)
         nibabel.save(modified_img, 'modified_image.nii')
+
+    def thresholding_menu(self, *args):
+
+        if self.umbralizacion_select.get() == "No seleccionado":
+            self.no_threshold()
+        elif self.umbralizacion_select.get() == "Umbralización":
+            self.umbralizacion()
+        elif self.umbralizacion_select.get() == "Isodata":
+            self.isodata()
+        elif self.umbralizacion_select.get() == "Crecimiento de regiones":
+            self.crecimiento_regiones
+        elif self.umbralizacion_select.get() == "K-means":
+            self.kmeans()
+
+    def no_threshold(self):
+        if hasattr(app, 'threshold_frame'):
+            self.threshold_frame.destroy()
+
+    def umbralizacion(self):
+        self.no_threshold()
+        self.sidebar_frame = customtkinter.CTkFrame(self, width=140, corner_radius=0)
+        self.sidebar_frame.grid(row=0, column=0, rowspan=6, sticky="nsew")
+        # self.sidebar_frame.grid_rowconfigure(8, weight=1)
+
+        self.titulo_label = customtkinter.CTkLabel(self.sidebar_frame, text="Umbralización", font=customtkinter.CTkFont(size=20, weight="bold"))
+        self.titulo_label.grid(row=0, column=0, padx=20, pady=(20, 10))
+    
 
 if __name__ == "__main__":
     app = GUI()
