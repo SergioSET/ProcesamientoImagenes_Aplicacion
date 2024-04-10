@@ -96,6 +96,8 @@ class GUI(customtkinter.CTk):
         self.brush_size_slider = customtkinter.CTkSlider(self.sidebar_frame, from_=1, to=10, number_of_steps=9, state="disabled", command=self.update_brush_size)
         self.brush_size_slider.set(3)
         self.brush_size_slider.grid(row=8, column=0, padx=20, pady=10)
+        self.clear_draws_button = customtkinter.CTkButton(self.sidebar_frame, text="Limpiar dibujos", command=self.clear_draws)
+        self.clear_draws_button.grid(row=9, column=0, padx=20, pady=(10, 20))
 
         self.update_dimension()
 
@@ -154,11 +156,6 @@ class GUI(customtkinter.CTk):
         self.ax.set_ylabel("Y")
         self.ax.axis("off")
 
-        # Overlay drawn markings
-        if hasattr(self, 'drawn_objects'):
-            for drawn_object in self.drawn_objects:
-                self.ax.add_patch(drawn_object)
-
         self.fig.canvas.mpl_connect('button_press_event', self.on_click)
         self.fig.canvas.mpl_connect('motion_notify_event', self.on_drag)
         self.canvas.draw()
@@ -172,27 +169,25 @@ class GUI(customtkinter.CTk):
 
     def on_click(self, event):
         if event.inaxes == self.ax:
-            x = int(event.xdata)
-            y = int(event.ydata)
-            if self.dimension == 0:
-                self.drawn_objects.append(matplotlib.patches.Circle((x, y), radius=self.brush_size, color=self.current_color, fill=True))
-            elif self.dimension == 1:
-                self.drawn_objects.append(matplotlib.patches.Circle((y, x), radius=self.brush_size, color=self.current_color, fill=True))
-            else:
-                self.drawn_objects.append(matplotlib.patches.Circle((x, self.file_shape[1] - y), radius=self.brush_size, color=self.current_color, fill=True))
-            self.update_image()
+            x, y = int(event.xdata), int(event.ydata)
+            circle = matplotlib.patches.Circle((x, y), radius=self.brush_size, color=self.current_color)
+            self.drawn_objects.append(circle)
+            self.ax.add_patch(circle)
+            self.canvas.draw()
 
     def on_drag(self, event):
         if event.inaxes == self.ax and event.button == 1:
-            x = int(event.xdata)
-            y = int(event.ydata)
-            if self.dimension == 0:
-                self.drawn_objects.append(matplotlib.patches.Circle((x, y), radius=self.brush_size, color=self.current_color, fill=True))
-            elif self.dimension == 1:
-                self.drawn_objects.append(matplotlib.patches.Circle((y, x), radius=self.brush_size, color=self.current_color, fill=True))
-            else:
-                self.drawn_objects.append(matplotlib.patches.Circle((x, self.file_shape[1] - y), radius=self.brush_size, color=self.current_color, fill=True))
-            self.update_image()
+            x, y = int(event.xdata), int(event.ydata)
+            circle = matplotlib.patches.Circle((x, y), radius=self.brush_size, color=self.current_color)
+            self.drawn_objects.append(circle)
+            self.ax.add_patch(circle)
+            self.canvas.draw()
+
+    def clear_draws(self):
+        for drawn_object in self.drawn_objects:
+            drawn_object.remove()
+        self.drawn_objects = []
+        self.canvas.draw()
 
 if __name__ == "__main__":
     app = GUI()
