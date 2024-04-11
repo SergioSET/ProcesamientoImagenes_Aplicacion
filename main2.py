@@ -254,6 +254,20 @@ class GUI(customtkinter.CTk):
             self.threshold_frame.destroy()
 
     def umbralizacion(self):
+        def umbralizar(*args):
+            self.tau_label.configure(text=f"Tau: {int(self.tau_slider.get())}")
+            tau = int(self.tau_slider.get())
+            self.modified_data = self.data.copy()
+            self.modified_data = (self.modified_data > tau).astype(int) * 255
+            self.update_image()
+
+        def umbralizar2(*args):
+            self.tau_label.configure(text=f"Tau: {int(self.tau_input.get())}")
+            tau = int(self.tau_input.get())
+            self.modified_data = self.data.copy()
+            self.modified_data = (self.modified_data > tau).astype(int) * 255
+            self.update_image()
+
         self.no_threshold()
         self.sidebar_frame = customtkinter.CTkFrame(self, width=140, corner_radius=0)
         self.sidebar_frame.grid(row=0, column=0, rowspan=6, sticky="nsew")
@@ -261,7 +275,45 @@ class GUI(customtkinter.CTk):
 
         self.titulo_label = customtkinter.CTkLabel(self.sidebar_frame, text="Umbralización", font=customtkinter.CTkFont(size=20, weight="bold"))
         self.titulo_label.grid(row=0, column=0, padx=20, pady=(20, 10))
+
+        self.tau_label = customtkinter.CTkLabel(self.sidebar_frame, text="Tau: 50", anchor="w")
+        self.tau_label.grid(row=1, column=0, padx=20, pady=(10, 0))
+        self.tau_slider = customtkinter.CTkSlider(self.sidebar_frame, from_=1, to=300, number_of_steps=299, command=umbralizar)
+        self.tau_slider.set(50)
+        self.tau_slider.grid(row=2, column=0, padx=20, pady=10)
+        self.tau_input = customtkinter.CTkEntry(self.sidebar_frame)
+        self.tau_input.grid(row=3, column=0, padx=20, pady=(0, 10))
+
+        self.umbralizar_button = customtkinter.CTkButton(self.sidebar_frame, text="Umbralizar", command=umbralizar2)
+        self.umbralizar_button.grid(row=4, column=0, padx=20, pady=(10, 20))
     
+    def isodata(self):
+        def isodata(*args):
+
+            t = 0
+            delta_tau = 1
+            tau = numpy.mean(self.data)
+            while delta_tau > 0.1:
+                g1 = self.data[self.data > tau]
+                g2 = self.data[self.data <= tau]
+                new_tau = (numpy.mean(g1) + numpy.mean(g2)) / 2
+                delta_tau = abs(tau - new_tau)
+                tau = new_tau
+
+            self.modified_data = self.data.copy()
+            self.modified_data = (self.modified_data > tau).astype(int) * 255
+            self.update_image()
+
+        self.no_threshold()
+        self.sidebar_frame = customtkinter.CTkFrame(self, width=140, corner_radius=0)
+        self.sidebar_frame.grid(row=0, column=0, rowspan=6, sticky="nsew")
+        # self.sidebar_frame.grid_rowconfigure(8, weight=1)
+
+        self.titulo_label = customtkinter.CTkLabel(self.sidebar_frame, text="Isodata", font=customtkinter.CTkFont(size=20, weight="bold"))
+        self.titulo_label.grid(row=0, column=0, padx=20, pady=(20, 10))
+
+        self.isodata_button = customtkinter.CTkButton(self.sidebar_frame, text="Isodata", command=isodata)
+        self.isodata_button.grid(row=1, column=0, padx=20, pady=(10, 20))
 
 if __name__ == "__main__":
     app = GUI()
