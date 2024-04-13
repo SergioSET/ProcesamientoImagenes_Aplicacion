@@ -6,6 +6,8 @@ import nibabel
 import numpy
 import matplotlib.pyplot
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from scipy import ndimage
+from queue import Queue
 
 customtkinter.set_appearance_mode("Dark") 
 customtkinter.set_default_color_theme("green")
@@ -94,19 +96,22 @@ class GUI(customtkinter.CTk):
         self.color_select = customtkinter.CTkOptionMenu(self.sidebar_frame, state="disabled", values=self.colors[1], command=self.update_color)
         self.color_select.grid(row=6, column=0, padx=20, pady=10)
 
+        self.drawing_label = customtkinter.CTkLabel(self.sidebar_frame, text="Dibujar", font=customtkinter.CTkFont(size=20, weight="bold"))
+        self.drawing_label.grid(row=7, column=0, padx=20, pady=(20, 10))
+
         self.brush_size_label = customtkinter.CTkLabel(self.sidebar_frame, text="Tamaño del pincel: 3", anchor="w")
-        self.brush_size_label.grid(row=7, column=0, padx=20, pady=(10, 0))
+        self.brush_size_label.grid(row=8, column=0, padx=20, pady=(10, 0))
         self.brush_size_slider = customtkinter.CTkSlider(self.sidebar_frame, from_=1, to=10, number_of_steps=9, state="disabled", command=self.update_brush_size)
         self.brush_size_slider.set(3)
-        self.brush_size_slider.grid(row=8, column=0, padx=20, pady=10)
+        self.brush_size_slider.grid(row=9, column=0, padx=20, pady=10)
         self.clear_draws_button = customtkinter.CTkButton(self.sidebar_frame, text="Limpiar dibujos", command=self.clear_draws)
-        self.clear_draws_button.grid(row=9, column=0, padx=20, pady=(10, 20))
+        self.clear_draws_button.grid(row=10, column=0, padx=20, pady=(10, 20))
 
         self.restore_file_button = customtkinter.CTkButton(self.sidebar_frame, text="Restaurar archivo", command=self.restore_file)
-        self.restore_file_button.grid(row=10, column=0, padx=20, pady=(10, 20))
+        self.restore_file_button.grid(row=11, column=0, padx=20, pady=(10, 20))
 
         self.save_file_button = customtkinter.CTkButton(self.sidebar_frame, text="Guardar archivo", command=self.save_file)
-        self.save_file_button.grid(row=11, column=0, padx=20, pady=(10, 20))
+        self.save_file_button.grid(row=12, column=0, padx=20, pady=(10, 20))
 
         self.update_dimension()
 
@@ -226,6 +231,7 @@ class GUI(customtkinter.CTk):
 
     def clear_draws(self):
         self.drawn_objects_dict[self.dimension][self.layer] = []
+        self.update_image()
 
     def restore_file(self):
         self.modified_data = self.data
@@ -245,12 +251,12 @@ class GUI(customtkinter.CTk):
         elif self.umbralizacion_select.get() == "Isodata":
             self.isodata()
         elif self.umbralizacion_select.get() == "Crecimiento de regiones":
-            self.crecimiento_regiones
+            self.crecimiento_regiones()
         elif self.umbralizacion_select.get() == "K-means":
             self.kmeans()
 
     def no_threshold(self):
-        if hasattr(app, 'threshold_frame'):
+        if hasattr(self, 'threshold_frame'):
             self.threshold_frame.destroy()
 
     def umbralizacion(self):
@@ -269,22 +275,22 @@ class GUI(customtkinter.CTk):
             self.update_image()
 
         self.no_threshold()
-        self.sidebar_frame = customtkinter.CTkFrame(self, width=140, corner_radius=0)
-        self.sidebar_frame.grid(row=0, column=0, rowspan=6, sticky="nsew")
-        # self.sidebar_frame.grid_rowconfigure(8, weight=1)
+        self.threshold_frame = customtkinter.CTkFrame(self, width=140, corner_radius=0)
+        self.threshold_frame.grid(row=0, column=0, rowspan=6, sticky="nsew")
+        # self.threshold_frame.grid_rowconfigure(8, weight=1)
 
-        self.titulo_label = customtkinter.CTkLabel(self.sidebar_frame, text="Umbralización", font=customtkinter.CTkFont(size=20, weight="bold"))
+        self.titulo_label = customtkinter.CTkLabel(self.threshold_frame, text="Umbralización", font=customtkinter.CTkFont(size=20, weight="bold"))
         self.titulo_label.grid(row=0, column=0, padx=20, pady=(20, 10))
 
-        self.tau_label = customtkinter.CTkLabel(self.sidebar_frame, text="Tau: 50", anchor="w")
+        self.tau_label = customtkinter.CTkLabel(self.threshold_frame, text="Tau: 50", anchor="w")
         self.tau_label.grid(row=1, column=0, padx=20, pady=(10, 0))
-        self.tau_slider = customtkinter.CTkSlider(self.sidebar_frame, from_=1, to=300, number_of_steps=299, command=umbralizar)
+        self.tau_slider = customtkinter.CTkSlider(self.threshold_frame, from_=1, to=300, number_of_steps=299, command=umbralizar)
         self.tau_slider.set(50)
         self.tau_slider.grid(row=2, column=0, padx=20, pady=10)
-        self.tau_input = customtkinter.CTkEntry(self.sidebar_frame)
+        self.tau_input = customtkinter.CTkEntry(self.threshold_frame)
         self.tau_input.grid(row=3, column=0, padx=20, pady=(0, 10))
 
-        self.umbralizar_button = customtkinter.CTkButton(self.sidebar_frame, text="Umbralizar", command=umbralizar2)
+        self.umbralizar_button = customtkinter.CTkButton(self.threshold_frame, text="Umbralizar", command=umbralizar2)
         self.umbralizar_button.grid(row=4, column=0, padx=20, pady=(10, 20))
     
     def isodata(self):
@@ -300,20 +306,121 @@ class GUI(customtkinter.CTk):
                 delta_tau = abs(tau - new_tau)
                 tau = new_tau
 
+            self.tau_label.configure(text=f"Tau: {int(tau)}")
             self.modified_data = self.data.copy()
             self.modified_data = (self.modified_data > tau).astype(int) * 255
             self.update_image()
 
         self.no_threshold()
-        self.sidebar_frame = customtkinter.CTkFrame(self, width=140, corner_radius=0)
-        self.sidebar_frame.grid(row=0, column=0, rowspan=6, sticky="nsew")
+        self.threshold_frame = customtkinter.CTkFrame(self, width=140, corner_radius=0)
+        self.threshold_frame.grid(row=0, column=0, rowspan=6, sticky="nsew")
         # self.sidebar_frame.grid_rowconfigure(8, weight=1)
 
-        self.titulo_label = customtkinter.CTkLabel(self.sidebar_frame, text="Isodata", font=customtkinter.CTkFont(size=20, weight="bold"))
+        self.titulo_label = customtkinter.CTkLabel(self.threshold_frame, text="Isodata", font=customtkinter.CTkFont(size=20, weight="bold"))
         self.titulo_label.grid(row=0, column=0, padx=20, pady=(20, 10))
 
-        self.isodata_button = customtkinter.CTkButton(self.sidebar_frame, text="Isodata", command=isodata)
-        self.isodata_button.grid(row=1, column=0, padx=20, pady=(10, 20))
+        self.tau_label = customtkinter.CTkLabel(self.threshold_frame, text="Tau: 50", anchor="w")
+        self.tau_label.grid(row=1, column=0, padx=20, pady=(10, 0))
+
+        self.isodata_button = customtkinter.CTkButton(self.threshold_frame, text="Isodata", command=isodata)
+        self.isodata_button.grid(row=2, column=0, padx=20, pady=(10, 20))
+
+    def is_similar(self, pixel_value, region_color, threshold=50):
+        # Check similarity based on color distance threshold
+        return numpy.linalg.norm(pixel_value - region_color) <= threshold
+
+    def crecimiento_regiones(self):
+        def crecimiento_regiones(*args):
+            print("Crecimiento de regiones")
+            if not hasattr(self, 'drawn_objects_dict'):
+                tkinter.messagebox.showerror("Error", "No hay dibujos en la imagen.")
+                return
+            
+            # Step 1: Collect seed points from drawn objects
+            seeds = []
+            for layer in self.drawn_objects_dict[self.dimension]:
+                for drawn_object in self.drawn_objects_dict[self.dimension][layer]:
+                    if isinstance(drawn_object, matplotlib.patches.Circle):
+                        x, y = drawn_object.center
+                        color = drawn_object.get_facecolor()
+                        seeds.append((x, y, layer, color))
+
+            # Step 2: Apply region growing algorithm
+            for seed in seeds:
+                x, y, z, color = seed
+                region_color = (color[0], color[1], color[2])  # Extract RGB color from matplotlib color format
+                region_mask = numpy.zeros_like(self.modified_data, dtype=bool)  # Initialize a mask for the region
+                region_masked = numpy.zeros_like(self.modified_data)  # Initialize an array to store region pixels
+
+                # Perform region growing using a queue
+                q = Queue()
+                q.put((x, y, z))  # Start from seed point
+
+                while not q.empty():
+                    cx, cy, cz = q.get()
+                    if region_mask[cx, cy, cz]:
+                        continue  # Skip if pixel already visited
+                    region_mask[cx, cy, cz] = True  # Mark pixel as visited
+
+                    # Check if pixel belongs to region based on similarity condition (e.g., color similarity)
+                    if self.is_similar(self.modified_data[cx, cy, cz], region_color):
+                        region_masked[cx, cy, cz] = self.modified_data[cx, cy, cz]  # Assign pixel value to region
+                        # Add neighboring pixels to the queue for further exploration
+                        for dx in range(-1, 2):
+                            for dy in range(-1, 2):
+                                for dz in range(-1, 2):
+                                    if 0 <= cx + dx < self.file_shape[0] and 0 <= cy + dy < self.file_shape[1] and 0 <= cz + dz < self.file_shape[2]:
+                                        q.put((cx + dx, cy + dy, cz + dz))
+
+                # Update modified data with region pixels
+                self.modified_data[region_mask] = region_masked[region_mask]
+
+            self.update_image()
+
+        self.no_threshold()
+        self.threshold_frame = customtkinter.CTkFrame(self, width=140, corner_radius=0)
+        self.threshold_frame.grid(row=0, column=0, rowspan=6, sticky="nsew")
+
+        self.titulo_label = customtkinter.CTkLabel(self.threshold_frame, text="Crecimiento de regiones", font=customtkinter.CTkFont(size=20, weight="bold"))
+        self.titulo_label.grid(row=0, column=0, padx=20, pady=(20, 10))
+
+        self.crecimiento_regiones_button = customtkinter.CTkButton(self.threshold_frame, text="Crecimiento de regiones", command=crecimiento_regiones)
+        self.crecimiento_regiones_button.grid(row=1, column=0, padx=20, pady=(10, 20))
+
+    def kmeans(self):
+        def kmeans(*args):
+            self.modified_data = self.data.copy()
+            self.modified_data = self.modified_data.reshape(-1, 1)
+            self.modified_data = self.modified_data / 255
+
+            # Perform K-means clustering
+            from sklearn.cluster import KMeans
+            kmeans = KMeans(n_clusters=int(self.cluster_input.get()), random_state=0).fit(self.modified_data)
+            cluster_centers = kmeans.cluster_centers_
+            cluster_labels = kmeans.labels_
+            self.modified_data = cluster_centers[cluster_labels].reshape(self.file_shape)
+
+            self.update_image()
+
+        def update_label(*args):
+            self.cluster_label.configure(text=f"Número de clusters: {int(self.cluster_input.get())}")
+
+        self.no_threshold()
+        self.threshold_frame = customtkinter.CTkFrame(self, width=140, corner_radius=0)
+        self.threshold_frame.grid(row=0, column=0, rowspan=6, sticky="nsew")
+
+        self.titulo_label = customtkinter.CTkLabel(self.threshold_frame, text="K-means", font=customtkinter.CTkFont(size=20, weight="bold"))
+        self.titulo_label.grid(row=0, column=0, padx=20, pady=(20, 10))
+
+        self.cluster_label = customtkinter.CTkLabel(self.threshold_frame, text="Número de clusters: 2", anchor="w")
+        self.cluster_label.grid(row=1, column=0, padx=20, pady=(10, 0))
+
+        self.cluster_input = customtkinter.CTkSlider(self.threshold_frame, from_=2, to=10, number_of_steps=8, command=update_label)
+        self.cluster_input.set(2)
+        self.cluster_input.grid(row=2, column=0, padx=20, pady=(10, 0))
+
+        self.kmeans_button = customtkinter.CTkButton(self.threshold_frame, text="K-means", command=kmeans)
+        self.kmeans_button.grid(row=3, column=0, padx=20, pady=(10, 20))
 
 if __name__ == "__main__":
     app = GUI()
