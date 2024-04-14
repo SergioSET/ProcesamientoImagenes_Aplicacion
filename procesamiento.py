@@ -8,6 +8,7 @@ import matplotlib.pyplot
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from scipy import ndimage
 from queue import Queue
+from skimage import io, img_as_ubyte
 
 customtkinter.set_appearance_mode("Dark")
 customtkinter.set_default_color_theme("green")
@@ -138,7 +139,7 @@ class GUI(customtkinter.CTk):
                 "Mean filter",
                 "Median filter",
             ],
-            command=self.thresholding_menu,
+            command=self.procesamiento_menu,
         )
         self.procesamiento_select.grid(row=5, column=0, padx=20, pady=10)
 
@@ -312,7 +313,7 @@ class GUI(customtkinter.CTk):
         modified_img = nibabel.Nifti1Image(self.modified_data, self.nib_image.affine)
         nibabel.save(modified_img, "modified_image.nii")
 
-    def thresholding_menu(self, *args):
+    def procesamiento_menu(self, *args):
 
         if self.procesamiento_select.get() == "No seleccionado":
             self.no_procesamiento()
@@ -342,25 +343,44 @@ class GUI(customtkinter.CTk):
             self.background_label.configure(text=f"Valor background: {int(value)}")
 
         def apply_histogram(data):
-            background = int(self.background_slider.get())
+            
+            def training_histogram(data):
+                background = int(self.background_slider.get())
 
-            # Obtener el histograma de intensidades
-            histogram, bins = numpy.histogram(
-                data[data > 20].flatten(), bins=256, range=(0, 256)
-            )
+                # Obtener el histograma de intensidades
+                histogram, bins = numpy.histogram(
+                    data[data > background].flatten(), bins=256, range=(0, 256)
+                )
+               
+                return histogram, bins
+            
+            def transform_histogram(data, target_histogram, target_bins):
+                background = int(self.background_slider.get())
 
-            # Calcular la función de densidad de probabilidad
-            pdf = histogram / histogram.sum()
+                # Obtener el histograma de intensidades
+                histogram, bins = numpy.histogram(
+                    data[data > background].flatten(), bins=256, range=(0, 256)
+                )
 
-            # Calcular la función de distribución acumulada
-            cdf = pdf.cumsum()
+                # Calcular la función de densidad de probabilidad
+                pdf = histogram / histogram.sum()
+                target_pdf = target_histogram / target_histogram.sum()
 
-            # Crear la imagen ecualizada
-            equalized_data = numpy.interp(data.flatten(), bins[:-1], cdf * 255)
+                # Calcular la función de distribución acumulada
+                cdf = pdf.cumsum()
+                target_cdf = target_pdf.cumsum()
 
-            self.modified_data = equalized_data.reshape(data.shape)
-            self.update_image()
+                # Crear la imagen ecualizada
+                equalized_data = numpy.interp(data.flatten(), bins[:-1], target_cdf * 255)
 
+                self.modified_data = equalized_data.reshape(data.shape)
+
+                self.update_image()
+
+            data2 = nibabel.load("sub-02_T1w.nii").get_fdata()
+
+            transform_histogram(self.data, *training_histogram(data2))
+            
         self.procesamiento_frame = customtkinter.CTkFrame(
             self, width=140, corner_radius=0
         )
@@ -464,6 +484,56 @@ class GUI(customtkinter.CTk):
         )
         self.matching_button.grid(row=3, column=0, padx=20, pady=(10, 20))
 
+    def white_straping(self):
+        self.no_procesamiento()
+
+        def update_percentil(value):
+            self.percentil_label.configure(text=f"Percentil: {int(value)}")
+
+        def apply_white_straping(data):
+            percentile = int(self.percentil_slider.get())
+
+            white_patch_image = img_as_ubyte(
+                (data * 1.0 / numpy.percentile(data, percentile, axis=(0, 1))).clip(0, 1)
+            )
+
+            self.modified_data = white_patch_image
+
+        self.procesamiento_frame = customtkinter.CTkFrame(
+            self, width=140, corner_radius=0
+        )
+        self.procesamiento_frame.grid(row=0, column=0, rowspan=6, sticky="nsew")
+
+        self.titulo_label = customtkinter.CTkLabel(
+            self.procesamiento_frame,
+            text="White Straping",
+            font=customtkinter.CTkFont(size=20, weight="bold"),
+        )
+        self.titulo_label.grid(row=0, column=0, padx=20, pady=(20, 10))
+
+        self.percentil_label = customtkinter.CTkLabel(
+            self.procesamiento_frame, text="Percentil: 10", font=("Arial", 10)
+        )
+        self.percentil_label.grid(row=1, column=0, padx=20, pady=(10, 0))
+
+        self.percentil_slider = customtkinter.CTkSlider(
+            self.procesamiento_frame,
+            from_=0,
+            to=100,
+            number_of_steps=100,
+            state="normal",
+            command=update_percentil,
+        )
+        self.percentil_slider.set(10)
+        self.percentil_slider.grid(row=2, column=0, padx=20, pady=10)
+
+        self.white_straping_button = customtkinter.CTkButton(
+            self.procesamiento_frame,
+            text="Aplicar White Straping",
+            command=lambda: apply_white_straping(self.data),
+        )
+        self.white_straping_button.grid(row=3, column=0, padx=20, pady=(10, 20))
+
     def zindex(self):
         self.no_procesamiento()
 
@@ -479,23 +549,52 @@ class GUI(customtkinter.CTk):
         )
         self.titulo_label.grid(row=0, column=0, padx=20, pady=(20, 10))
 
+        def update_background(value):
+            self.background_label.configure(text=f"Valor background: {int(value)}")
+
+        def apply_zindex(data):
+            background = int(self.background_slider.get())
+
+            img = self.modified_data
+
+            mean_value = img[img > background].mean()
+            std_value = img[img > background].std()
+
+            img_zcore = (img - mean_value) / std_value
+
+            img *= img_zcore
+
+            self.modified_data = img
+
+            matplotlib.pyplot.hist(img_zcore[img > 10], 100)
+            matplotlib.pyplot.show()
+
+            self.update_image()
+
         img = self.modified_data
 
-        background = 10
+        self.background_label = customtkinter.CTkLabel(
+            self.procesamiento_frame, text="Valor background: 10", font=("Arial", 10)
+        )
+        self.background_label.grid(row=1, column=0, padx=20, pady=(10, 0))
 
-        mean_value = img[img > background].mean()
-        std_value = img[img > background].std()
+        self.background_slider = customtkinter.CTkSlider(
+            self.procesamiento_frame,
+            from_=0,
+            to=50,
+            number_of_steps=50,
+            state="normal",
+            command=update_background,
+        )
+        self.background_slider.set(10)
+        self.background_slider.grid(row=2, column=0, padx=20, pady=10)
 
-        img_zcore = (img - mean_value) / std_value
-
-        img *= img_zcore
-
-        self.modified_data = img
-
-        matplotlib.pyplot.hist(img_zcore[img > 10], 100)
-        matplotlib.pyplot.show()
-
-        self.update_image()
+        self.zindex_button = customtkinter.CTkButton(
+            self.procesamiento_frame,
+            text="Aplicar Zindex",
+            command=lambda: apply_zindex(img),
+        )
+        self.zindex_button.grid(row=3, column=0, padx=20, pady=(10, 20))
 
     def mean_filter(self):
         self.no_procesamiento()
