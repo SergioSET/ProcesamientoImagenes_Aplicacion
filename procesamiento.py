@@ -21,7 +21,7 @@ class GUI(customtkinter.CTk):
         self.geometry(f"{1100}x{580}")
         self.grid_columnconfigure(1, weight=1)
         self.grid_columnconfigure((2, 3), weight=0)
-        self.grid_rowconfigure((0, 1, 2), weight=1)
+        self.grid_rowconfigure((0, 1), weight=1)
 
         self.file_path = None
         self.file_shape = None
@@ -47,13 +47,19 @@ class GUI(customtkinter.CTk):
 
     def setup_menu(self):
         self.open_file_button = customtkinter.CTkButton(
-            self, text="Abrir archivo .nii", command=self.open_file
+            self, text="Abrir archivo .nii", font=("Arial", 20), command=self.open_file
         )
-        self.open_file_button.grid(row=0, column=0, padx=20, pady=20)
+        self.open_file_button.grid(row=0, column=1, padx=20, pady=20, sticky="nsew")
+
         self.load_default_file_button = customtkinter.CTkButton(
-            self, text="Cargar archivo .nii por defecto", command=self.load_default_file
+            self,
+            text="Cargar archivo .nii por defecto",
+            font=("Arial", 20),
+            command=self.load_default_file,
         )
-        self.load_default_file_button.grid(row=1, column=0, padx=20, pady=20)
+        self.load_default_file_button.grid(
+            row=1, column=1, padx=20, pady=20, sticky="nsew"
+        )
 
     def open_file(self):
         file_path = customtkinter.filedialog.askopenfilename(
@@ -123,6 +129,7 @@ class GUI(customtkinter.CTk):
             self.sidebar_frame,
             state="disabled",
             values=[
+                "No seleccionado",
                 "Histogram",
                 "Matching",
                 "White Straping",
@@ -199,7 +206,7 @@ class GUI(customtkinter.CTk):
         self.layer_label.configure(text=f"Layer: {int(self.layer)}")
         self.layer_slider.configure(state="normal")
         self.layer_slider.set(self.layer)
-        self.umbralizacion_select.configure(state="normal")
+        self.procesamiento_select.configure(state="normal")
         self.color_select.configure(state="normal")
         self.brush_size_slider.configure(state="normal")
 
@@ -305,16 +312,22 @@ class GUI(customtkinter.CTk):
 
     def thresholding_menu(self, *args):
 
-        if self.umbralizacion_select.get() == "No seleccionado":
-            self.no_threshold()
-        elif self.umbralizacion_select.get() == "Umbralización":
-            self.umbralizacion()
-        elif self.umbralizacion_select.get() == "Isodata":
-            self.isodata()
-        elif self.umbralizacion_select.get() == "Crecimiento de regiones":
-            self.crecimiento_regiones()
-        elif self.umbralizacion_select.get() == "K-means":
-            self.kmeans()
+        if self.procesamiento_select.get() == "No seleccionado":
+            self.no_procesamiento()
+        elif self.procesamiento_select.get() == "Histogram":
+            self.histogram()
+        elif self.procesamiento_select.get() == "Matching":
+            self.matching()
+        elif self.procesamiento_select.get() == "White Straping":
+            self.white_straping()
+        elif self.procesamiento_select.get() == "Intesity rescaller":
+            self.intesity_rescaller()
+        elif self.procesamiento_select.get() == "Zindex":
+            self.zindex()
+        elif self.procesamiento_select.get() == "Mean filter":
+            self.mean_filter()
+        elif self.procesamiento_select.get() == "Median filter":
+            self.median_filter()
 
     def no_procesamiento(self):
         if hasattr(self, "procesamiento_frame"):
@@ -324,13 +337,73 @@ class GUI(customtkinter.CTk):
         if hasattr(self, "procesamiento_frame"):
             self.procesamiento_frame.destroy()
 
+        self.procesamiento_frame = customtkinter.CTkFrame(
+            self, width=140, corner_radius=0
+        )
+        self.procesamiento_frame.grid(row=0, column=0, rowspan=6, sticky="nsew")
+
+        self.procesamiento_label = customtkinter.CTkLabel(
+            self.procesamiento_frame,
+            text="Histogram",
+            font=customtkinter.CTkFont(size=20, weight="bold"),
+        )
+        self.procesamiento_label.grid(row=0, column=0, padx=20, pady=(20, 10))
+
+        hist, bins = numpy.histogram(
+            self.modified_data.flatten(), bins=256, range=(0, 256)
+        )
+
+        mean_value = numpy.mean(self.modified_data)
+        std_value = numpy.std(self.modified_data)
+        img_zcore = (self.modified_data - mean_value) / std_value
+
+        matplotlib.pyplot.hist(hist, bins=bins, color="gray")
+    
+        hist_fig = matplotlib.pyplot.Figure(figsize=(5, 3))
+        hist_ax = hist_fig.add_subplot(111)
+        
+        hist_ax.hist(hist, bins=bins, color="gray")
+        
+
+
+        # if self.dimension == 0:
+        #     slice_data = numpy.rot90(self.modified_data[self.layer, :, :])
+        # elif self.dimension == 1:
+        #     slice_data = numpy.rot90(self.modified_data[:, self.layer, :])
+        # else:
+        #     slice_data = numpy.rot90(self.modified_data[:, :, self.layer])
+
+        # hist, bins = numpy.histogram(
+        #     slice_data.flatten(), bins=256, range=(0, 256)
+        # )
+
+        # hist_fig = matplotlib.pyplot.Figure(figsize=(5, 3))
+        # hist_ax = hist_fig.add_subplot(111)
+
+        # hist_ax.hist(hist, bins=bins, color="gray")
+
+        # hist_ax.set_title("Histogram")
+        # hist_ax.set_xlabel("Pixel Intensity")
+        # hist_ax.set_ylabel("Frequency")
+
+        # hist_canvas = FigureCanvasTkAgg(hist_fig, master=self.procesamiento_frame)
+        # hist_canvas.draw()
+        # hist_canvas.get_tk_widget().grid(row=1, column=0, padx=20, pady=10)
+
+        self.update_image()
+
+    def matching(self):
+        if hasattr(self, "procesamiento_frame"):
+            self.procesamiento_frame.destroy()
+
         self.procesamiento_frame = customtkinter.CTkFrame(self.sidebar_frame)
         self.procesamiento_frame.grid(row=6, column=0, padx=20, pady=10)
 
-        self.histograma = numpy.histogram(self.modified_data, bins=50)
-        self.ax.hist(self.modified_data.flatten(), bins=50)
-        self.canvas.draw()
-        
+        self.modified_data = ndimage.morphology.grey_erosion(
+            self.modified_data, size=(3, 3)
+        )
+        self.update_image()
+
 
 def main():
     app = GUI()

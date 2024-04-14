@@ -16,11 +16,11 @@ class GUI(customtkinter.CTk):
     def __init__(self):
         super().__init__()
 
-        self.title("Procesamiento de imágenes")
+        self.title("Segmentación de imágenes")
         self.geometry(f"{1100}x{580}")
-        # self.grid_columnconfigure(1, weight=1)
-        # self.grid_columnconfigure((2, 3), weight=0)
-        # self.grid_rowconfigure((0, 1, 2), weight=1)
+        self.grid_columnconfigure(1, weight=1)
+        self.grid_columnconfigure((2, 3), weight=0)
+        self.grid_rowconfigure((0, 1), weight=1)
 
         self.file_path = None
         self.file_shape = None
@@ -46,13 +46,19 @@ class GUI(customtkinter.CTk):
 
     def setup_menu(self):
         self.open_file_button = customtkinter.CTkButton(
-            self, text="Abrir archivo .nii", command=self.open_file
+            self, text="Abrir archivo .nii", font=("Arial", 20), command=self.open_file
         )
-        self.open_file_button.grid(row=0, column=0, padx=20, pady=20)
+        self.open_file_button.grid(row=0, column=1, padx=20, pady=20, sticky="nsew")
+
         self.load_default_file_button = customtkinter.CTkButton(
-            self, text="Cargar archivo .nii por defecto", command=self.load_default_file
+            self,
+            text="Cargar archivo .nii por defecto",
+            font=("Arial", 20),
+            command=self.load_default_file,
         )
-        self.load_default_file_button.grid(row=1, column=0, padx=20, pady=20)
+        self.load_default_file_button.grid(
+            row=1, column=1, padx=20, pady=20, sticky="nsew"
+        )
 
     def open_file(self):
         file_path = customtkinter.filedialog.askopenfilename(
