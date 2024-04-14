@@ -343,7 +343,7 @@ class GUI(customtkinter.CTk):
             self.background_label.configure(text=f"Valor background: {int(value)}")
 
         def apply_histogram(data):
-            
+
             def training_histogram(data):
                 background = int(self.background_slider.get())
 
@@ -351,9 +351,9 @@ class GUI(customtkinter.CTk):
                 histogram, bins = numpy.histogram(
                     data[data > background].flatten(), bins=256, range=(0, 256)
                 )
-               
+
                 return histogram, bins
-            
+
             def transform_histogram(data, target_histogram, target_bins):
                 background = int(self.background_slider.get())
 
@@ -371,7 +371,9 @@ class GUI(customtkinter.CTk):
                 target_cdf = target_pdf.cumsum()
 
                 # Crear la imagen ecualizada
-                equalized_data = numpy.interp(data.flatten(), bins[:-1], target_cdf * 255)
+                equalized_data = numpy.interp(
+                    data.flatten(), bins[:-1], target_cdf * 255
+                )
 
                 self.modified_data = equalized_data.reshape(data.shape)
 
@@ -380,7 +382,7 @@ class GUI(customtkinter.CTk):
             data2 = nibabel.load("sub-02_T1w.nii").get_fdata()
 
             transform_histogram(self.data, *training_histogram(data2))
-            
+
         self.procesamiento_frame = customtkinter.CTkFrame(
             self, width=140, corner_radius=0
         )
@@ -494,7 +496,9 @@ class GUI(customtkinter.CTk):
             percentile = int(self.percentil_slider.get())
 
             white_patch_image = img_as_ubyte(
-                (data * 1.0 / numpy.percentile(data, percentile, axis=(0, 1))).clip(0, 1)
+                (data * 1.0 / numpy.percentile(data, percentile, axis=(0, 1))).clip(
+                    0, 1
+                )
             )
 
             self.modified_data = white_patch_image
@@ -603,17 +607,25 @@ class GUI(customtkinter.CTk):
             filtered_data = numpy.zeros_like(data, dtype=numpy.float64)
             depth, height, width = data.shape
             n = neighborhood // 2
-            
-            padded_data = numpy.pad(data, ((n, n), (n, n), (n, n)), mode='constant')
-        
-            neighborhood_sums = numpy.zeros((depth, height, width), dtype=numpy.float64)
-            
+
+            padded_data = numpy.pad(data, ((n, n), (n, n), (n, n)), mode="constant")
+
+            neighborhood_values = []
+            filter_size = neighborhood**3
+
             for dz in range(-n, n + 1):
                 for dy in range(-n, n + 1):
                     for dx in range(-n, n + 1):
-                        neighborhood_sums += padded_data[n+dz : n+dz+depth, n+dy : n+dy+height, n+dx : n+dx+width]
+                        neighborhood_values.append(
+                            padded_data[
+                                n + dz : n + dz + depth,
+                                n + dy : n + dy + height,
+                                n + dx : n + dx + width,
+                            ]
+                        )
 
-            filter_size = neighborhood ** 3
+            neighborhood_values = numpy.array(neighborhood_values)
+            neighborhood_sums = numpy.sum(neighborhood_values, axis=0)
             filtered_data = neighborhood_sums / filter_size
 
             return filtered_data
@@ -667,20 +679,31 @@ class GUI(customtkinter.CTk):
     def median_filter(self):
         self.no_procesamiento()
 
-       
         def apply_median_filter(data, neighborhood):
             filtered_data = numpy.zeros_like(data, dtype=numpy.float64)
             depth, height, width = data.shape
             n = neighborhood // 2
 
-            padded_data = numpy.pad(data, ((n, n), (n, n), (n, n)), mode='constant')
+            padded_data = numpy.pad(data, ((n, n), (n, n), (n, n)), mode="constant")
 
-            for dz in range(depth):
-                for dy in range(height):
-                    for dx in range(width):
-                        filtered_data[dz, dy, dx] = numpy.median(padded_data[dz:dz+neighborhood, dy:dy+neighborhood, dx:dx+neighborhood])
-                        
-            return filtered_data        
+            neighborhood_values = []
+
+            for dz in range(-n, n + 1):
+                for dy in range(-n, n + 1):
+                    for dx in range(-n, n + 1):
+                        neighborhood_values.append(
+                            padded_data[
+                                n + dz : n + dz + depth,
+                                n + dy : n + dy + height,
+                                n + dx : n + dx + width,
+                            ]
+                        )
+
+            neighborhood_values = numpy.array(neighborhood_values)
+            neighborhood_median = numpy.median(neighborhood_values, axis=0)
+            filtered_data = neighborhood_median
+
+            return filtered_data
 
         def median_filter(*args):
             neighborhood_sizes = {
