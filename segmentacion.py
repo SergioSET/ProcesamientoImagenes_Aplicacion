@@ -222,6 +222,8 @@ class GUI(customtkinter.CTk):
         else:
             slice_data = numpy.rot90(self.modified_data[:, :, self.layer])
 
+        self.image = slice_data
+
         if not hasattr(self, "fig"):
             self.fig = matplotlib.pyplot.Figure(figsize=(5, 5))
             self.ax = self.fig.add_subplot(111)

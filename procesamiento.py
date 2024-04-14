@@ -226,6 +226,8 @@ class GUI(customtkinter.CTk):
         else:
             slice_data = numpy.rot90(self.modified_data[:, :, self.layer])
 
+        self.image = slice_data
+
         if not hasattr(self, "fig"):
             self.fig = matplotlib.pyplot.Figure(figsize=(5, 5))
             self.ax = self.fig.add_subplot(111)
@@ -334,74 +336,231 @@ class GUI(customtkinter.CTk):
             self.procesamiento_frame.destroy()
 
     def histogram(self):
-        if hasattr(self, "procesamiento_frame"):
-            self.procesamiento_frame.destroy()
+        self.no_procesamiento()
 
         self.procesamiento_frame = customtkinter.CTkFrame(
             self, width=140, corner_radius=0
         )
         self.procesamiento_frame.grid(row=0, column=0, rowspan=6, sticky="nsew")
 
-        self.procesamiento_label = customtkinter.CTkLabel(
+        self.titulo_label = customtkinter.CTkLabel(
             self.procesamiento_frame,
-            text="Histogram",
-            font=customtkinter.CTkFont(size=20, weight="bold"),
+            text="Histograma de intensidades",
+            font=customtkinter.CTkFont(size=15, weight="bold"),
         )
-        self.procesamiento_label.grid(row=0, column=0, padx=20, pady=(20, 10))
+        self.titulo_label.grid(row=0, column=0, padx=20, pady=(20, 10))
 
         hist, bins = numpy.histogram(
             self.modified_data.flatten(), bins=256, range=(0, 256)
         )
 
-        mean_value = numpy.mean(self.modified_data)
-        std_value = numpy.std(self.modified_data)
-        img_zcore = (self.modified_data - mean_value) / std_value
+        if self.dimension == 0:
+            slice_data = numpy.rot90(self.modified_data[self.layer, :, :])
+        elif self.dimension == 1:
+            slice_data = numpy.rot90(self.modified_data[:, self.layer, :])
+        else:
+            slice_data = numpy.rot90(self.modified_data[:, :, self.layer])
 
-        matplotlib.pyplot.hist(hist, bins=bins, color="gray")
-    
+        hist, bins = numpy.histogram(
+            slice_data.flatten(),
+            bins=256,
+            range=(0, 256),
+            # self.modified_data.flatten(), bins=256, range=(0, 256)
+        )
+
         hist_fig = matplotlib.pyplot.Figure(figsize=(5, 3))
         hist_ax = hist_fig.add_subplot(111)
-        
+
         hist_ax.hist(hist, bins=bins, color="gray")
-        
 
+        hist_ax.set_title("Histogram")
+        hist_ax.set_xlabel("Pixel Intensity")
+        hist_ax.set_ylabel("Frequency")
 
-        # if self.dimension == 0:
-        #     slice_data = numpy.rot90(self.modified_data[self.layer, :, :])
-        # elif self.dimension == 1:
-        #     slice_data = numpy.rot90(self.modified_data[:, self.layer, :])
-        # else:
-        #     slice_data = numpy.rot90(self.modified_data[:, :, self.layer])
-
-        # hist, bins = numpy.histogram(
-        #     slice_data.flatten(), bins=256, range=(0, 256)
-        # )
-
-        # hist_fig = matplotlib.pyplot.Figure(figsize=(5, 3))
-        # hist_ax = hist_fig.add_subplot(111)
-
-        # hist_ax.hist(hist, bins=bins, color="gray")
-
-        # hist_ax.set_title("Histogram")
-        # hist_ax.set_xlabel("Pixel Intensity")
-        # hist_ax.set_ylabel("Frequency")
-
-        # hist_canvas = FigureCanvasTkAgg(hist_fig, master=self.procesamiento_frame)
-        # hist_canvas.draw()
-        # hist_canvas.get_tk_widget().grid(row=1, column=0, padx=20, pady=10)
+        hist_canvas = FigureCanvasTkAgg(hist_fig, master=self.procesamiento_frame)
+        hist_canvas.draw()
+        hist_canvas.get_tk_widget().grid(row=1, column=0, padx=20, pady=10)
 
         self.update_image()
 
     def matching(self):
-        if hasattr(self, "procesamiento_frame"):
-            self.procesamiento_frame.destroy()
+        self.no_procesamiento()
 
-        self.procesamiento_frame = customtkinter.CTkFrame(self.sidebar_frame)
-        self.procesamiento_frame.grid(row=6, column=0, padx=20, pady=10)
+        self.procesamiento_frame = customtkinter.CTkFrame(
+            self, width=140, corner_radius=0
+        )
+        self.procesamiento_frame.grid(row=0, column=0, rowspan=6, sticky="nsew")
 
         self.modified_data = ndimage.morphology.grey_erosion(
             self.modified_data, size=(3, 3)
         )
+        self.update_image()
+
+    def zindex(self):
+        self.no_procesamiento()
+
+        self.procesamiento_frame = customtkinter.CTkFrame(
+            self, width=140, corner_radius=0
+        )
+        self.procesamiento_frame.grid(row=0, column=0, rowspan=6, sticky="nsew")
+
+        self.titulo_label = customtkinter.CTkLabel(
+            self.procesamiento_frame,
+            text="Zindex",
+            font=customtkinter.CTkFont(size=20, weight="bold"),
+        )
+        self.titulo_label.grid(row=0, column=0, padx=20, pady=(20, 10))
+
+        img = self.modified_data
+
+        background = 10
+
+        mean_value = img[img > background].mean()
+        std_value = img[img > background].std()
+
+        img_zcore = (img - mean_value) / std_value
+
+        matplotlib.pyplot.hist(img[img > 10], 100)
+        matplotlib.pyplot.show()
+
+        matplotlib.pyplot.hist(img_zcore[img > 10], 100)
+        matplotlib.pyplot.show()
+
+        self.update_image()
+
+    def mean_filter(self):
+        self.no_procesamiento()
+
+        def mean_filter(*args):
+            neighborhood_sizes = {
+                "3x3": 3,
+                "5x5": 5,
+                "7x7": 7,
+                "9x9": 9,
+            }
+
+            if mean_filter_select.get() == "No seleccionado":
+                self.modified_data = self.data
+                self.update_image()
+                return
+
+            neighborhood = neighborhood_sizes[mean_filter_select.get()]
+
+            self.modified_data = ndimage.uniform_filter(self.data, size=neighborhood)
+            self.update_image()
+
+        self.procesamiento_frame = customtkinter.CTkFrame(
+            self, width=140, corner_radius=0
+        )
+        self.procesamiento_frame.grid(row=0, column=0, rowspan=6, sticky="nsew")
+
+        self.titulo_label = customtkinter.CTkLabel(
+            self.procesamiento_frame,
+            text="Filtro de media",
+            font=customtkinter.CTkFont(size=20, weight="bold"),
+        )
+        self.titulo_label.grid(row=0, column=0, padx=20, pady=(20, 10))
+
+        mean_filter_select = customtkinter.CTkOptionMenu(
+            self.procesamiento_frame,
+            values=[
+                "No seleccionado",
+                "3x3",
+                "5x5",
+                "7x7",
+                "9x9",
+            ],
+            command=mean_filter,
+        )
+        mean_filter_select.grid(row=1, column=0, padx=20, pady=10)
+
+        self.update_image()
+
+    def median_filter(self):
+        self.no_procesamiento()
+
+        def apply_median_filter(data, neighborhood):
+            # Tamaño del vecindario
+            n = neighborhood // 2
+
+            # Copia de los datos originales
+            filtered_data = numpy.copy(data)
+
+            # Dimensiones de los datos
+            depth, height, width = data.shape
+
+            # Iterar sobre cada píxel en los datos
+            for d in range(depth):
+                for h in range(height):
+                    for w in range(width):
+                        # Obtener el vecindario alrededor del píxel actual
+                        neighborhood_values = []
+                        for dz in range(-n, n + 1):
+                            for dy in range(-n, n + 1):
+                                for dx in range(-n, n + 1):
+                                    new_d = d + dz
+                                    new_h = h + dy
+                                    new_w = w + dx
+                                    # Verificar los límites de los índices
+                                    if (
+                                        0 <= new_d < depth
+                                        and 0 <= new_h < height
+                                        and 0 <= new_w < width
+                                    ):
+                                        neighborhood_values.append(
+                                            data[new_d, new_h, new_w]
+                                        )
+
+                        # Calcular la mediana del vecindario y asignarla al píxel actual
+                        filtered_data[d, h, w] = numpy.median(neighborhood_values)
+
+            return filtered_data
+
+        def median_filter(*args):
+            neighborhood_sizes = {
+                "3x3": 3,
+                "5x5": 5,
+                "7x7": 7,
+                "9x9": 9,
+            }
+
+            if median_filter_select.get() == "No seleccionado":
+                self.modified_data = self.data
+                self.update_image()
+                return
+
+            neighborhood = neighborhood_sizes[median_filter_select.get()]
+
+            # self.modified_data = ndimage.median_filter(self.data, size=neighborhood)
+            self.modified_data = apply_median_filter(self.data, neighborhood)
+
+            self.update_image()
+
+        self.procesamiento_frame = customtkinter.CTkFrame(
+            self, width=140, corner_radius=0
+        )
+        self.procesamiento_frame.grid(row=0, column=0, rowspan=6, sticky="nsew")
+
+        self.titulo_label = customtkinter.CTkLabel(
+            self.procesamiento_frame,
+            text="Filtro de mediana",
+            font=customtkinter.CTkFont(size=20, weight="bold"),
+        )
+        self.titulo_label.grid(row=0, column=0, padx=20, pady=(20, 10))
+
+        median_filter_select = customtkinter.CTkOptionMenu(
+            self.procesamiento_frame,
+            values=[
+                "No seleccionado",
+                "3x3",
+                "5x5",
+                "7x7",
+                "9x9",
+            ],
+            command=median_filter,
+        )
+        median_filter_select.grid(row=1, column=0, padx=20, pady=10)
+
         self.update_image()
 
 
