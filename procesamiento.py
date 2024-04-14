@@ -542,8 +542,8 @@ class GUI(customtkinter.CTk):
         self.no_procesamiento()
 
         def apply_intensity_rescaler(data):            
-            min_value = 30
-            max_value = 200
+            min_value = numpy.min(data)
+            max_value = numpy.max(data)
             data = (data - min_value) / (max_value - min_value)
 
             self.modified_data = data
