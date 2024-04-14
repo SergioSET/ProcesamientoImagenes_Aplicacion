@@ -600,41 +600,24 @@ class GUI(customtkinter.CTk):
         self.no_procesamiento()
 
         def apply_mean_filter(data, neighborhood):
-            # Tamaño del vecindario
             n = neighborhood // 2
 
-            # Copia de los datos originales
-            filtered_data = numpy.copy(data)
+            # Create an array to hold the sum of the neighborhood values
+            sum_array = numpy.zeros_like(data, dtype=numpy.float64)
 
-            # Dimensiones de los datos
-            depth, height, width = data.shape
+            # Iterate over each dimension of the neighborhood
+            for dz in range(-n, n + 1):
+                for dy in range(-n, n + 1):
+                    for dx in range(-n, n + 1):
+                        # Shift the original array to create a view of the neighborhood
+                        shifted_data = numpy.roll(data, shift=(dz, dy, dx), axis=(0, 1, 2))
+                        # Accumulate the values
+                        sum_array += shifted_data
 
-            # Iterar sobre cada píxel en los datos
-            for d in range(depth):
-                for h in range(height):
-                    for w in range(width):
-                        # Obtener el vecindario alrededor del píxel actual
-                        neighborhood_values = []
-                        for dz in range(-n, n + 1):
-                            for dy in range(-n, n + 1):
-                                for dx in range(-n, n + 1):
-                                    new_d = d + dz
-                                    new_h = h + dy
-                                    new_w = w + dx
-                                    # Verificar los límites de los índices
-                                    if (
-                                        0 <= new_d < depth
-                                        and 0 <= new_h < height
-                                        and 0 <= new_w < width
-                                    ):
-                                        neighborhood_values.append(
-                                            data[new_d, new_h, new_w]
-                                        )
+            # Calculate the mean using the summed values and the size of the neighborhood
+            mean_array = sum_array / (neighborhood ** 3)
 
-                        # Calcular la mediana del vecindario y asignarla al píxel actual
-                        filtered_data[d, h, w] = numpy.mean(neighborhood_values)
-
-            return filtered_data
+            return mean_array
 
         def mean_filter(*args):
             neighborhood_sizes = {
