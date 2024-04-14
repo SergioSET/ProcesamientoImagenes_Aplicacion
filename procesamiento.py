@@ -338,6 +338,29 @@ class GUI(customtkinter.CTk):
     def histogram(self):
         self.no_procesamiento()
 
+        def update_background(value):
+            self.background_label.configure(text=f"Valor background: {int(value)}")
+
+        def apply_histogram(data):
+            background = int(self.background_slider.get())
+
+            # Obtener el histograma de intensidades
+            histogram, bins = numpy.histogram(
+                data[data > 20].flatten(), bins=256, range=(0, 256)
+            )
+
+            # Calcular la función de densidad de probabilidad
+            pdf = histogram / histogram.sum()
+
+            # Calcular la función de distribución acumulada
+            cdf = pdf.cumsum()
+
+            # Crear la imagen ecualizada
+            equalized_data = numpy.interp(data.flatten(), bins[:-1], cdf * 255)
+
+            self.modified_data = equalized_data.reshape(data.shape)
+            self.update_image()
+
         self.procesamiento_frame = customtkinter.CTkFrame(
             self, width=140, corner_radius=0
         )
@@ -350,51 +373,96 @@ class GUI(customtkinter.CTk):
         )
         self.titulo_label.grid(row=0, column=0, padx=20, pady=(20, 10))
 
-        hist, bins = numpy.histogram(
-            self.modified_data.flatten(), bins=256, range=(0, 256)
+        self.background_label = customtkinter.CTkLabel(
+            self.procesamiento_frame, text="Valor background: 10", font=("Arial", 10)
         )
+        self.background_label.grid(row=1, column=0, padx=20, pady=(10, 0))
 
-        if self.dimension == 0:
-            slice_data = numpy.rot90(self.modified_data[self.layer, :, :])
-        elif self.dimension == 1:
-            slice_data = numpy.rot90(self.modified_data[:, self.layer, :])
-        else:
-            slice_data = numpy.rot90(self.modified_data[:, :, self.layer])
-
-        hist, bins = numpy.histogram(
-            slice_data.flatten(),
-            bins=256,
-            range=(0, 256),
-            # self.modified_data.flatten(), bins=256, range=(0, 256)
+        self.background_slider = customtkinter.CTkSlider(
+            self.procesamiento_frame,
+            from_=0,
+            to=50,
+            number_of_steps=50,
+            state="normal",
+            command=update_background,
         )
+        self.background_slider.set(10)
+        self.background_slider.grid(row=2, column=0, padx=20, pady=10)
 
-        hist_fig = matplotlib.pyplot.Figure(figsize=(5, 3))
-        hist_ax = hist_fig.add_subplot(111)
-
-        hist_ax.hist(hist, bins=bins, color="gray")
-
-        hist_ax.set_title("Histogram")
-        hist_ax.set_xlabel("Pixel Intensity")
-        hist_ax.set_ylabel("Frequency")
-
-        hist_canvas = FigureCanvasTkAgg(hist_fig, master=self.procesamiento_frame)
-        hist_canvas.draw()
-        hist_canvas.get_tk_widget().grid(row=1, column=0, padx=20, pady=10)
-
-        self.update_image()
+        self.histogram_button = customtkinter.CTkButton(
+            self.procesamiento_frame,
+            text="Aplicar histograma",
+            command=lambda: apply_histogram(self.data),
+        )
+        self.histogram_button.grid(row=3, column=0, padx=20, pady=(10, 20))
 
     def matching(self):
         self.no_procesamiento()
+
+        def update_background(value):
+            self.background_label.configure(text=f"Valor background: {int(value)}")
+
+        def apply_matching(data, target_data):
+            background = int(self.background_slider.get())
+
+            # Obtener el histograma de intensidades
+            histogram, bins = numpy.histogram(
+                data[data > background].flatten(), bins=256, range=(0, 256)
+            )
+            target_histogram, target_bins = numpy.histogram(
+                target_data[target_data > background].flatten(),
+                bins=256,
+                range=(0, 256),
+            )
+
+            # Calcular la función de densidad de probabilidad
+            pdf = histogram / histogram.sum()
+            target_pdf = target_histogram / target_histogram.sum()
+
+            # Calcular la función de distribución acumulada
+            cdf = pdf.cumsum()
+            target_cdf = target_pdf.cumsum()
+
+            # Crear la imagen ecualizada
+            equalized_data = numpy.interp(data.flatten(), bins[:-1], target_cdf * 255)
+
+            self.modified_data = equalized_data.reshape(data.shape)
+            self.update_image()
 
         self.procesamiento_frame = customtkinter.CTkFrame(
             self, width=140, corner_radius=0
         )
         self.procesamiento_frame.grid(row=0, column=0, rowspan=6, sticky="nsew")
 
-        self.modified_data = ndimage.morphology.grey_erosion(
-            self.modified_data, size=(3, 3)
+        self.titulo_label = customtkinter.CTkLabel(
+            self.procesamiento_frame,
+            text="Matching",
+            font=customtkinter.CTkFont(size=20, weight="bold"),
         )
-        self.update_image()
+        self.titulo_label.grid(row=0, column=0, padx=20, pady=(20, 10))
+
+        self.background_label = customtkinter.CTkLabel(
+            self.procesamiento_frame, text="Valor background: 10", font=("Arial", 10)
+        )
+        self.background_label.grid(row=1, column=0, padx=20, pady=(10, 0))
+
+        self.background_slider = customtkinter.CTkSlider(
+            self.procesamiento_frame,
+            from_=0,
+            to=50,
+            number_of_steps=50,
+            state="normal",
+            command=update_background,
+        )
+        self.background_slider.set(10)
+        self.background_slider.grid(row=2, column=0, padx=20, pady=10)
+
+        self.matching_button = customtkinter.CTkButton(
+            self.procesamiento_frame,
+            text="Aplicar matching algoritm",
+            command=lambda: apply_matching(self.data, self.modified_data),
+        )
+        self.matching_button.grid(row=3, column=0, padx=20, pady=(10, 20))
 
     def zindex(self):
         self.no_procesamiento()
@@ -420,8 +488,9 @@ class GUI(customtkinter.CTk):
 
         img_zcore = (img - mean_value) / std_value
 
-        matplotlib.pyplot.hist(img[img > 10], 100)
-        matplotlib.pyplot.show()
+        img *= img_zcore
+
+        self.modified_data = img
 
         matplotlib.pyplot.hist(img_zcore[img > 10], 100)
         matplotlib.pyplot.show()
@@ -430,6 +499,43 @@ class GUI(customtkinter.CTk):
 
     def mean_filter(self):
         self.no_procesamiento()
+
+        def apply_mean_filter(data, neighborhood):
+            # Tamaño del vecindario
+            n = neighborhood // 2
+
+            # Copia de los datos originales
+            filtered_data = numpy.copy(data)
+
+            # Dimensiones de los datos
+            depth, height, width = data.shape
+
+            # Iterar sobre cada píxel en los datos
+            for d in range(depth):
+                for h in range(height):
+                    for w in range(width):
+                        # Obtener el vecindario alrededor del píxel actual
+                        neighborhood_values = []
+                        for dz in range(-n, n + 1):
+                            for dy in range(-n, n + 1):
+                                for dx in range(-n, n + 1):
+                                    new_d = d + dz
+                                    new_h = h + dy
+                                    new_w = w + dx
+                                    # Verificar los límites de los índices
+                                    if (
+                                        0 <= new_d < depth
+                                        and 0 <= new_h < height
+                                        and 0 <= new_w < width
+                                    ):
+                                        neighborhood_values.append(
+                                            data[new_d, new_h, new_w]
+                                        )
+
+                        # Calcular la mediana del vecindario y asignarla al píxel actual
+                        filtered_data[d, h, w] = numpy.mean(neighborhood_values)
+
+            return filtered_data
 
         def mean_filter(*args):
             neighborhood_sizes = {
@@ -446,7 +552,8 @@ class GUI(customtkinter.CTk):
 
             neighborhood = neighborhood_sizes[mean_filter_select.get()]
 
-            self.modified_data = ndimage.uniform_filter(self.data, size=neighborhood)
+            # self.modified_data = ndimage.uniform_filter(self.data, size=neighborhood)
+            self.modified_data = apply_mean_filter(self.data, neighborhood)
             self.update_image()
 
         self.procesamiento_frame = customtkinter.CTkFrame(
