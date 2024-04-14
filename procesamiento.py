@@ -538,6 +538,37 @@ class GUI(customtkinter.CTk):
         )
         self.white_straping_button.grid(row=3, column=0, padx=20, pady=(10, 20))
 
+    def intesity_rescaller(self):
+        self.no_procesamiento()
+
+        def apply_intensity_rescaler(data):            
+            min_value = 30
+            max_value = 200
+            data = (data - min_value) / (max_value - min_value)
+
+            self.modified_data = data
+            self.update_image()
+
+        self.procesamiento_frame = customtkinter.CTkFrame(
+            self, width=140, corner_radius=0
+        )
+        self.procesamiento_frame.grid(row=0, column=0, rowspan=6, sticky="nsew")
+
+        self.titulo_label = customtkinter.CTkLabel(
+            self.procesamiento_frame,
+            text="Intesity rescaller",
+            font=customtkinter.CTkFont(size=20, weight="bold"),
+        )
+        self.titulo_label.grid(row=0, column=0, padx=20, pady=(20, 10))
+
+        self.intesity_rescaler_button = customtkinter.CTkButton(
+            self.procesamiento_frame,
+            text="Aplicar Intesity rescaler",
+            command=lambda: apply_intensity_rescaler(self.data),
+        )
+        self.intesity_rescaler_button.grid(row=1, column=0, padx=20, pady=(10, 20))
+
+        
     def zindex(self):
         self.no_procesamiento()
 
