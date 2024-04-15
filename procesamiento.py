@@ -492,16 +492,38 @@ class GUI(customtkinter.CTk):
         def update_percentil(value):
             self.percentil_label.configure(text=f"Percentil: {int(value)}")
 
-        def apply_white_straping(data):
+        def apply_white_straping():
+
+            data = self.data.copy()
+            
+            data = data[data > 20]
+
             percentile = int(self.percentil_slider.get())
 
-            white_patch_image = img_as_ubyte(
-                (data * 1.0 / numpy.percentile(data, percentile, axis=(0, 1))).clip(
-                    0, 1
-                )
-            )
+            histograma, bins = numpy.histogram(data.flatten(), bins=100)
 
-            self.modified_data = white_patch_image
+            hist = matplotlib.pyplot.hist(data.flatten(), 100)
+            # matplotlib.pyplot.show()
+
+            ultimo_pico = numpy.max(histograma)
+
+            print(ultimo_pico)
+
+            imagen_normalizada = data * ultimo_pico
+
+            self.modified_data = imagen_normalizada
+            
+            matplotlib.pyplot.figure(figsize=(12, 4))
+            matplotlib.pyplot.subplot(1, 2, 1)
+            matplotlib.pyplot.imshow(data[0], cmap="gray")
+            matplotlib.pyplot.title("Original")
+            matplotlib.pyplot.subplot(1, 2, 2)
+            matplotlib.pyplot.imshow(imagen_normalizada[0], cmap="gray")
+            matplotlib.pyplot.title("White Straping")
+            matplotlib.pyplot.show()
+
+
+            self.update_image()
 
         self.procesamiento_frame = customtkinter.CTkFrame(
             self, width=140, corner_radius=0
@@ -534,14 +556,17 @@ class GUI(customtkinter.CTk):
         self.white_straping_button = customtkinter.CTkButton(
             self.procesamiento_frame,
             text="Aplicar White Straping",
-            command=lambda: apply_white_straping(self.data),
+            command=apply_white_straping,
         )
         self.white_straping_button.grid(row=3, column=0, padx=20, pady=(10, 20))
 
     def intesity_rescaller(self):
         self.no_procesamiento()
 
-        def apply_intensity_rescaler(data):            
+        def apply_intensity_rescaler():
+            
+            data = self.data.copy()
+
             min_value = numpy.min(data)
             max_value = numpy.max(data)
             data = (data - min_value) / (max_value - min_value)
@@ -564,11 +589,10 @@ class GUI(customtkinter.CTk):
         self.intesity_rescaler_button = customtkinter.CTkButton(
             self.procesamiento_frame,
             text="Aplicar Intesity rescaler",
-            command=lambda: apply_intensity_rescaler(self.data),
+            command=apply_intensity_rescaler,
         )
         self.intesity_rescaler_button.grid(row=1, column=0, padx=20, pady=(10, 20))
 
-        
     def zindex(self):
         self.no_procesamiento()
 
@@ -587,10 +611,10 @@ class GUI(customtkinter.CTk):
         def update_background(value):
             self.background_label.configure(text=f"Valor background: {int(value)}")
 
-        def apply_zindex(data):
+        def apply_zindex():
             background = int(self.background_slider.get())
 
-            img = self.modified_data
+            img = self.data.copy()
 
             mean_value = img[img > background].mean()
             std_value = img[img > background].std()
@@ -601,12 +625,10 @@ class GUI(customtkinter.CTk):
 
             self.modified_data = img
 
-            matplotlib.pyplot.hist(img_zcore[img > 10], 100)
-            matplotlib.pyplot.show()
+            # matplotlib.pyplot.hist(img_zcore[img > 10], 100)
+            # matplotlib.pyplot.show()
 
             self.update_image()
-
-        img = self.modified_data
 
         self.background_label = customtkinter.CTkLabel(
             self.procesamiento_frame, text="Valor background: 10", font=("Arial", 10)
@@ -627,7 +649,7 @@ class GUI(customtkinter.CTk):
         self.zindex_button = customtkinter.CTkButton(
             self.procesamiento_frame,
             text="Aplicar Zindex",
-            command=lambda: apply_zindex(img),
+            command=apply_zindex,
         )
         self.zindex_button.grid(row=3, column=0, padx=20, pady=(10, 20))
 
