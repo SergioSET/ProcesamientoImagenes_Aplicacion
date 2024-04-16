@@ -427,54 +427,41 @@ class GUI(customtkinter.CTk):
 
     def crecimiento_regiones(self):
         def crecimiento_regiones(*args):
-            if self.drawn_objects_dict is None or self.drawn_objects_dict == {}:
-                tkinter.messagebox.showerror("Error", "No hay dibujos en la imagen.")
+            if self.drawn_objects_dict == {}:
+                tkinter.messagebox.showerror("Error", "No se han seleccionado semillas.")
                 return
-
-            data = self.modified_data.copy()
-            segmented_image = numpy.zeros_like(data)
-            visited = numpy.zeros_like(data)
+            
+            data = self.data.copy()
+            tol = 50
 
             seeds = []
-            for layer in self.drawn_objects_dict[self.dimension]:
-                for drawn_object in self.drawn_objects_dict[self.dimension][layer]:
-                    if isinstance(drawn_object, matplotlib.patches.Circle):
-                        x, y = drawn_object.center
-                        color = drawn_object.get_facecolor()
-                        seeds.append((x, y, layer, color))
-
-            neighbors = data
+            for layer in self.drawn_objects_dict[0]:
+                for circle in self.drawn_objects_dict[0][layer]:
+                    x, y = circle.center
+                    z = layer
+                    seeds.append((x, y, z))
+            
+            segmented = numpy.zeros_like(data)
 
             for seed in seeds:
-                x, y, z, color = seed
+                x, y, z = seed                
+                cluster_value = data[x,y,z]
+                neighbors = [(x, y, z)]
+                while neighbors:
+                    x, y, z = neighbors.pop()
+                    for dx in [-1,0,1]:
+                        for dy in [-1,0,1]:
+                            for dz in [-1,0,1]:
+                                nx, ny, nz = x + dx, y + dy, z + dz
+                                if nx >= 0 and nx < data.shape[0] and \
+                                    ny >= 0 and ny < data.shape[1] and \
+                                    nz >= 0 and nz < data.shape[2]:
+                                    if numpy.abs(cluster_value - data[nx,ny,nz]) < tol and \
+                                        segmented[nx,ny,nz] == 0:
+                                        segmented[nx,ny,nz] = 1
+                                        neighbors.append((nx, ny, nz))
 
-                seed_value = data[z, y, x]
-
-                seed_list = [(x, y, z)]
-
-                while seed_list:
-                    current_point = seed_list.pop(0)
-                    segmented_image[current_point] = 1
-
-                    for neighbor in neighbors:
-                        x_new = current_point[0] + neighbor[0]
-                        y_new = current_point[1] + neighbor[1]
-                        z_new = current_point[2] + neighbor[2]
-
-                        # Check if the new point is inside the image bounds
-                        if (
-                            0 <= x_new < data.shape[0]
-                            and 0 <= y_new < data.shape[1]
-                            and 0 <= z_new < data.shape[2]
-                            and not visited[x_new, y_new, z_new]
-                        ):
-
-                            # Check if the neighboring point is within the threshold
-                            if abs(data[x_new, y_new, z_new] - seed_value) < 10:
-                                seed_list.append((x_new, y_new, z_new))
-                                visited[x_new, y_new, z_new] = 1
-
-            self.modified_data = segmented_image
+            self.modified_data = segmented
 
             self.update_image()
 
