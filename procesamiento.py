@@ -455,18 +455,19 @@ class GUI(customtkinter.CTk):
 
             data = self.data.copy()
 
-            hist, bin_edges = numpy.histogram(data[data > 10].flatten(), bins=100)
+            background = int(self.background_slider.get())
 
-            peaks, *args = find_peaks(hist, height=100)
+            histogram, edges = numpy.histogram(data[data > background].flatten(), bins=100)
 
-            # matplotlib.pyplot.plot(hist)
-            # matplotlib.pyplot.plot(peaks, hist[peaks], "x")
+            peaks, properties = find_peaks(histogram, height=10000)
+
+            # matplotlib.pyplot.plot(histogram)
+            # matplotlib.pyplot.plot(peaks, histogram[peaks], "x")
             # matplotlib.pyplot.show()
 
-            peakValues = bin_edges[peaks]
-
-            image_data_rescaled = data / peakValues[9]
-            print(peakValues[9])
+            peakValues = edges[peaks]
+            
+            image_data_rescaled = data / peakValues[len(peakValues) - 1]
 
             self.modified_data = image_data_rescaled
 
