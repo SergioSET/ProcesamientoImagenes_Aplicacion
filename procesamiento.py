@@ -131,11 +131,10 @@ class GUI(customtkinter.CTk):
             state="disabled",
             values=[
                 "No seleccionado",
-                "Histogram",
-                "Matching",
-                "White Straping",
+                "Histogram Matching",
+                "White Stripe",
                 "Intesity rescaller",
-                "Zindex",
+                "Z Score",
                 "Mean filter",
                 "Median filter",
             ],
@@ -317,16 +316,14 @@ class GUI(customtkinter.CTk):
 
         if self.procesamiento_select.get() == "No seleccionado":
             self.no_procesamiento()
-        elif self.procesamiento_select.get() == "Histogram":
-            self.histogram()
-        elif self.procesamiento_select.get() == "Matching":
-            self.matching()
-        elif self.procesamiento_select.get() == "White Straping":
-            self.white_straping()
+        elif self.procesamiento_select.get() == "Histogram Matching":
+            self.histogramMatching()
+        elif self.procesamiento_select.get() == "White Stripe":
+            self.white_stripe()
         elif self.procesamiento_select.get() == "Intesity rescaller":
             self.intesity_rescaller()
-        elif self.procesamiento_select.get() == "Zindex":
-            self.zindex()
+        elif self.procesamiento_select.get() == "Z Score":
+            self.zscore()
         elif self.procesamiento_select.get() == "Mean filter":
             self.mean_filter()
         elif self.procesamiento_select.get() == "Median filter":
@@ -336,7 +333,7 @@ class GUI(customtkinter.CTk):
         if hasattr(self, "procesamiento_frame"):
             self.procesamiento_frame.destroy()
 
-    def histogram(self):
+    def histogramMatching(self):
         self.no_procesamiento()
 
         def update_background(value):
@@ -418,84 +415,16 @@ class GUI(customtkinter.CTk):
         )
         self.histogram_button.grid(row=3, column=0, padx=20, pady=(10, 20))
 
-    def matching(self):
-        self.no_procesamiento()
-
-        def update_background(value):
-            self.background_label.configure(text=f"Valor background: {int(value)}")
-
-        def apply_matching(data, target_data):
-            background = int(self.background_slider.get())
-
-            # Obtener el histograma de intensidades
-            histogram, bins = numpy.histogram(
-                data[data > background].flatten(), bins=256, range=(0, 256)
-            )
-            target_histogram, target_bins = numpy.histogram(
-                target_data[target_data > background].flatten(),
-                bins=256,
-                range=(0, 256),
-            )
-
-            # Calcular la función de densidad de probabilidad
-            pdf = histogram / histogram.sum()
-            target_pdf = target_histogram / target_histogram.sum()
-
-            # Calcular la función de distribución acumulada
-            cdf = pdf.cumsum()
-            target_cdf = target_pdf.cumsum()
-
-            # Crear la imagen ecualizada
-            equalized_data = numpy.interp(data.flatten(), bins[:-1], target_cdf * 255)
-
-            self.modified_data = equalized_data.reshape(data.shape)
-            self.update_image()
-
-        self.procesamiento_frame = customtkinter.CTkFrame(
-            self, width=140, corner_radius=0
-        )
-        self.procesamiento_frame.grid(row=0, column=0, rowspan=6, sticky="nsew")
-
-        self.titulo_label = customtkinter.CTkLabel(
-            self.procesamiento_frame,
-            text="Matching",
-            font=customtkinter.CTkFont(size=20, weight="bold"),
-        )
-        self.titulo_label.grid(row=0, column=0, padx=20, pady=(20, 10))
-
-        self.background_label = customtkinter.CTkLabel(
-            self.procesamiento_frame, text="Valor background: 10", font=("Arial", 10)
-        )
-        self.background_label.grid(row=1, column=0, padx=20, pady=(10, 0))
-
-        self.background_slider = customtkinter.CTkSlider(
-            self.procesamiento_frame,
-            from_=0,
-            to=50,
-            number_of_steps=50,
-            state="normal",
-            command=update_background,
-        )
-        self.background_slider.set(10)
-        self.background_slider.grid(row=2, column=0, padx=20, pady=10)
-
-        self.matching_button = customtkinter.CTkButton(
-            self.procesamiento_frame,
-            text="Aplicar matching algoritm",
-            command=lambda: apply_matching(self.data, self.modified_data),
-        )
-        self.matching_button.grid(row=3, column=0, padx=20, pady=(10, 20))
-
-    def white_straping(self):
+    def white_stripe(self):
         self.no_procesamiento()
 
         def update_percentil(value):
             self.percentil_label.configure(text=f"Percentil: {int(value)}")
 
-        def apply_white_straping():
+        def apply_white_stripe():
 
             data = self.data.copy()
-            
+
             data = data[data > 20]
 
             percentile = int(self.percentil_slider.get())
@@ -512,16 +441,15 @@ class GUI(customtkinter.CTk):
             imagen_normalizada = data * ultimo_pico
 
             self.modified_data = imagen_normalizada
-            
+
             matplotlib.pyplot.figure(figsize=(12, 4))
             matplotlib.pyplot.subplot(1, 2, 1)
             matplotlib.pyplot.imshow(data[0], cmap="gray")
             matplotlib.pyplot.title("Original")
             matplotlib.pyplot.subplot(1, 2, 2)
             matplotlib.pyplot.imshow(imagen_normalizada[0], cmap="gray")
-            matplotlib.pyplot.title("White Straping")
+            matplotlib.pyplot.title("White Stripe")
             matplotlib.pyplot.show()
-
 
             self.update_image()
 
@@ -532,7 +460,7 @@ class GUI(customtkinter.CTk):
 
         self.titulo_label = customtkinter.CTkLabel(
             self.procesamiento_frame,
-            text="White Straping",
+            text="White Stripe",
             font=customtkinter.CTkFont(size=20, weight="bold"),
         )
         self.titulo_label.grid(row=0, column=0, padx=20, pady=(20, 10))
@@ -553,18 +481,18 @@ class GUI(customtkinter.CTk):
         self.percentil_slider.set(10)
         self.percentil_slider.grid(row=2, column=0, padx=20, pady=10)
 
-        self.white_straping_button = customtkinter.CTkButton(
+        self.white_stripe_button = customtkinter.CTkButton(
             self.procesamiento_frame,
-            text="Aplicar White Straping",
-            command=apply_white_straping,
+            text="Aplicar White Stripe",
+            command=apply_white_stripe,
         )
-        self.white_straping_button.grid(row=3, column=0, padx=20, pady=(10, 20))
+        self.white_stripe_button.grid(row=3, column=0, padx=20, pady=(10, 20))
 
     def intesity_rescaller(self):
         self.no_procesamiento()
 
         def apply_intensity_rescaler():
-            
+
             data = self.data.copy()
 
             min_value = numpy.min(data)
@@ -593,7 +521,7 @@ class GUI(customtkinter.CTk):
         )
         self.intesity_rescaler_button.grid(row=1, column=0, padx=20, pady=(10, 20))
 
-    def zindex(self):
+    def zscore(self):
         self.no_procesamiento()
 
         self.procesamiento_frame = customtkinter.CTkFrame(
@@ -603,7 +531,7 @@ class GUI(customtkinter.CTk):
 
         self.titulo_label = customtkinter.CTkLabel(
             self.procesamiento_frame,
-            text="Zindex",
+            text="Z Score",
             font=customtkinter.CTkFont(size=20, weight="bold"),
         )
         self.titulo_label.grid(row=0, column=0, padx=20, pady=(20, 10))
@@ -611,7 +539,7 @@ class GUI(customtkinter.CTk):
         def update_background(value):
             self.background_label.configure(text=f"Valor background: {int(value)}")
 
-        def apply_zindex():
+        def apply_zscore():
             background = int(self.background_slider.get())
 
             img = self.data.copy()
@@ -646,12 +574,12 @@ class GUI(customtkinter.CTk):
         self.background_slider.set(10)
         self.background_slider.grid(row=2, column=0, padx=20, pady=10)
 
-        self.zindex_button = customtkinter.CTkButton(
+        self.zscore_button = customtkinter.CTkButton(
             self.procesamiento_frame,
-            text="Aplicar Zindex",
-            command=apply_zindex,
+            text="Aplicar Z Score",
+            command=apply_zscore,
         )
-        self.zindex_button.grid(row=3, column=0, padx=20, pady=(10, 20))
+        self.zscore_button.grid(row=3, column=0, padx=20, pady=(10, 20))
 
     def mean_filter(self):
         self.no_procesamiento()
