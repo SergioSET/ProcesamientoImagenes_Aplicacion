@@ -427,10 +427,13 @@ class GUI(customtkinter.CTk):
 
     def crecimiento_regiones(self):
         def crecimiento_regiones(*args):
-            print("Crecimiento de regiones")
-            if not hasattr(self, "drawn_objects_dict"):
+            if self.drawn_objects_dict is None or self.drawn_objects_dict == {}:
                 tkinter.messagebox.showerror("Error", "No hay dibujos en la imagen.")
                 return
+
+            data = self.modified_data.copy()
+            segmented_image = numpy.zeros_like(data)
+            visited = numpy.zeros_like(data)
 
             seeds = []
             for layer in self.drawn_objects_dict[self.dimension]:
@@ -440,38 +443,38 @@ class GUI(customtkinter.CTk):
                         color = drawn_object.get_facecolor()
                         seeds.append((x, y, layer, color))
 
+            neighbors = data
+
             for seed in seeds:
                 x, y, z, color = seed
-                region_color = (
-                    color[0],
-                    color[1],
-                    color[2],
-                )
-                region_mask = numpy.zeros_like(self.modified_data, dtype=bool)
-                region_masked = numpy.zeros_like(self.modified_data)
 
-                q = Queue()
-                q.put((x, y, z))
+                seed_value = data[z, y, x]
 
-                while not q.empty():
-                    cx, cy, cz = q.get()
-                    if region_mask[cx, cy, cz]:
-                        continue
-                    region_mask[cx, cy, cz] = True
+                seed_list = [(x, y, z)]
 
-                    if self.is_similar(self.modified_data[cx, cy, cz], region_color):
-                        region_masked[cx, cy, cz] = self.modified_data[cx, cy, cz]
-                        for dx in range(-1, 2):
-                            for dy in range(-1, 2):
-                                for dz in range(-1, 2):
-                                    if (
-                                        0 <= cx + dx < self.file_shape[0]
-                                        and 0 <= cy + dy < self.file_shape[1]
-                                        and 0 <= cz + dz < self.file_shape[2]
-                                    ):
-                                        q.put((cx + dx, cy + dy, cz + dz))
+                while seed_list:
+                    current_point = seed_list.pop(0)
+                    segmented_image[current_point] = 1
 
-                self.modified_data[region_mask] = region_masked[region_mask]
+                    for neighbor in neighbors:
+                        x_new = current_point[0] + neighbor[0]
+                        y_new = current_point[1] + neighbor[1]
+                        z_new = current_point[2] + neighbor[2]
+
+                        # Check if the new point is inside the image bounds
+                        if (
+                            0 <= x_new < data.shape[0]
+                            and 0 <= y_new < data.shape[1]
+                            and 0 <= z_new < data.shape[2]
+                            and not visited[x_new, y_new, z_new]
+                        ):
+
+                            # Check if the neighboring point is within the threshold
+                            if abs(data[x_new, y_new, z_new] - seed_value) < 10:
+                                seed_list.append((x_new, y_new, z_new))
+                                visited[x_new, y_new, z_new] = 1
+
+            self.modified_data = segmented_image
 
             self.update_image()
 
@@ -495,26 +498,36 @@ class GUI(customtkinter.CTk):
 
     def kmeans(self):
         def kmeans(*args):
-            self.modified_data = self.data.copy()
-            self.modified_data = self.modified_data.reshape(-1, 1)
-            self.modified_data = self.modified_data / 255
+            data = self.data.copy()
+            clusters = int(self.cluster_input.get())
+            iterations = int(self.iterations_input.get())
 
-            from sklearn.cluster import KMeans
-
-            kmeans = KMeans(
-                n_clusters=int(self.cluster_input.get()), random_state=0
-            ).fit(self.modified_data)
-            cluster_centers = kmeans.cluster_centers_
-            cluster_labels = kmeans.labels_
-            self.modified_data = cluster_centers[cluster_labels].reshape(
-                self.file_shape
+            cluster_values = numpy.linspace(
+                numpy.amin(data), numpy.amax(data), clusters
             )
+
+            for i in range(iterations):
+                distances = [numpy.abs(cluster - data) for cluster in cluster_values]
+
+                segmented = numpy.argmin(distances, axis=0)
+
+                for cluster_idx in range(clusters):
+                    cluster_values[cluster_idx] = numpy.mean(
+                        data[segmented == cluster_idx]
+                    )
+
+            self.modified_data = segmented
 
             self.update_image()
 
         def update_label(*args):
             self.cluster_label.configure(
                 text=f"Número de clusters: {int(self.cluster_input.get())}"
+            )
+
+        def update_iterations_label(*args):
+            self.iterations_label.configure(
+                text=f"Iteraciones: {int(self.iterations_input.get())}"
             )
 
         self.no_threshold()
@@ -543,10 +556,24 @@ class GUI(customtkinter.CTk):
         self.cluster_input.set(2)
         self.cluster_input.grid(row=2, column=0, padx=20, pady=(10, 0))
 
+        self.iterations_label = customtkinter.CTkLabel(
+            self.threshold_frame, text="Iteraciones: 10", anchor="w"
+        )
+        self.iterations_label.grid(row=3, column=0, padx=20, pady=(10, 0))
+        self.iterations_input = customtkinter.CTkSlider(
+            self.threshold_frame,
+            from_=1,
+            to=100,
+            number_of_steps=99,
+            command=update_iterations_label,
+        )
+        self.iterations_input.set(10)
+        self.iterations_input.grid(row=4, column=0, padx=20, pady=(10, 0))
+
         self.kmeans_button = customtkinter.CTkButton(
             self.threshold_frame, text="K-means", command=kmeans
         )
-        self.kmeans_button.grid(row=3, column=0, padx=20, pady=(10, 20))
+        self.kmeans_button.grid(row=5, column=0, padx=20, pady=(10, 20))
 
 
 def main():
