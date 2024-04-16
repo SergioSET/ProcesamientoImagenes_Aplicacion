@@ -307,7 +307,6 @@ class GUI(customtkinter.CTk):
 
     def restore_file(self):
         self.modified_data = self.data
-        self.drawn_objects_dict = {}
         self.update_image()
 
     def save_file(self):

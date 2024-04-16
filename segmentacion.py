@@ -307,7 +307,6 @@ class GUI(customtkinter.CTk):
 
     def restore_file(self):
         self.modified_data = self.data
-        self.drawn_objects_dict = {}
         self.update_image()
 
     def save_file(self):
@@ -426,17 +425,20 @@ class GUI(customtkinter.CTk):
         return numpy.linalg.norm(pixel_value - region_color) <= threshold
 
     def crecimiento_regiones(self):
+        def update_tolerance(*args):
+            self.tolerance_label.configure(text=f"Tolerancia: {int(self.tolerance_slider.get())}")
+
         def crecimiento_regiones(*args):
             if self.drawn_objects_dict == {}:
                 tkinter.messagebox.showerror("Error", "No se han seleccionado semillas.")
                 return
             
             data = self.data.copy()
-            tol = 50
+            tol = int(self.tolerance_slider.get())
 
             seeds = []
-            for layer in self.drawn_objects_dict[0]:
-                for circle in self.drawn_objects_dict[0][layer]:
+            for layer in self.drawn_objects_dict[self.dimension]:
+                for circle in self.drawn_objects_dict[self.dimension][layer]:
                     x, y = circle.center
                     z = layer
                     seeds.append((x, y, z))
@@ -476,12 +478,27 @@ class GUI(customtkinter.CTk):
         )
         self.titulo_label.grid(row=0, column=0, padx=20, pady=(20, 10))
 
+        self.tolerance_label = customtkinter.CTkLabel(
+            self.threshold_frame, text="Tolerancia: 10", anchor="w"
+        )
+        self.tolerance_label.grid(row=1, column=0, padx=20, pady=(10, 0))
+
+        self.tolerance_slider = customtkinter.CTkSlider(
+            self.threshold_frame,
+            from_=1,
+            to=300,
+            number_of_steps=299,
+            command=update_tolerance,
+        )
+        self.tolerance_slider.set(10)
+        self.tolerance_slider.grid(row=2, column=0, padx=20, pady=(10, 0))
+
         self.crecimiento_regiones_button = customtkinter.CTkButton(
             self.threshold_frame,
             text="Crecimiento de regiones",
             command=crecimiento_regiones,
         )
-        self.crecimiento_regiones_button.grid(row=1, column=0, padx=20, pady=(10, 20))
+        self.crecimiento_regiones_button.grid(row=3, column=0, padx=20, pady=(10, 20))
 
     def kmeans(self):
         def kmeans(*args):
