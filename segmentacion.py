@@ -17,7 +17,7 @@ class GUI(customtkinter.CTk):
         super().__init__()
 
         self.title("Segmentación de imágenes")
-        self.geometry(f"{1100}x{580}")
+        self.geometry(f"{500}x{200}")
         self.grid_columnconfigure(1, weight=1)
         self.grid_columnconfigure((2, 3), weight=0)
         self.grid_rowconfigure((0, 1), weight=1)
@@ -85,11 +85,14 @@ class GUI(customtkinter.CTk):
             print("No file selected")
 
     def setup_sidebar(self):
+        self.geometry(f"{1100}x{580}")
         self.modified_data = self.data.copy()
 
         self.open_file_button.destroy()
         self.load_default_file_button.destroy()
-        self.sidebar_frame = customtkinter.CTkFrame(self, width=140, corner_radius=0)
+        self.sidebar_frame = customtkinter.CTkScrollableFrame(
+            self, width=230, corner_radius=0
+        )
         self.sidebar_frame.grid(row=0, column=2, rowspan=6, sticky="nsew")
 
         self.dimensiones_label = customtkinter.CTkLabel(
@@ -337,7 +340,12 @@ class GUI(customtkinter.CTk):
             self.update_image()
 
         def umbralizar2(*args):
-            self.tau_label.configure(text=f"Tau: {int(self.tau_input.get())}")
+            if not self.tau_input.get().isdigit():
+                tkinter.messagebox.showerror("Error", "Tau debe ser un número entero.")
+                return
+            else:
+                self.tau_label.configure(text=f"Tau: {int(self.tau_input.get())}")
+                self.tau_slider.set(int(self.tau_input.get()))
             tau = int(self.tau_input.get())
             self.modified_data = self.data.copy()
             self.modified_data = (self.modified_data > tau).astype(int) * 255
@@ -405,7 +413,7 @@ class GUI(customtkinter.CTk):
         self.titulo_label.grid(row=0, column=0, padx=20, pady=(20, 10))
 
         self.tau_label = customtkinter.CTkLabel(
-            self.threshold_frame, text="Tau: 50", anchor="w"
+            self.threshold_frame, text="Tau: ", anchor="w"
         )
         self.tau_label.grid(row=1, column=0, padx=20, pady=(10, 0))
 

@@ -9,6 +9,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from scipy import ndimage
 from queue import Queue
 from skimage import io, img_as_ubyte
+from scipy.signal import find_peaks
 
 customtkinter.set_appearance_mode("Dark")
 customtkinter.set_default_color_theme("green")
@@ -19,7 +20,7 @@ class GUI(customtkinter.CTk):
         super().__init__()
 
         self.title("Procesamiento")
-        self.geometry(f"{1100}x{580}")
+        self.geometry(f"{500}x{200}")
         self.grid_columnconfigure(1, weight=1)
         self.grid_columnconfigure((2, 3), weight=0)
         self.grid_rowconfigure((0, 1), weight=1)
@@ -87,11 +88,12 @@ class GUI(customtkinter.CTk):
             print("No file selected")
 
     def setup_sidebar(self):
+        self.geometry(f"{1100}x{580}")
         self.modified_data = self.data.copy()
 
         self.open_file_button.destroy()
         self.load_default_file_button.destroy()
-        self.sidebar_frame = customtkinter.CTkFrame(self, width=140, corner_radius=0)
+        self.sidebar_frame = customtkinter.CTkScrollableFrame(self, width=230, corner_radius=0)
         self.sidebar_frame.grid(row=0, column=2, rowspan=6, sticky="nsew")
 
         self.dimensiones_label = customtkinter.CTkLabel(
@@ -339,46 +341,59 @@ class GUI(customtkinter.CTk):
         def update_background(value):
             self.background_label.configure(text=f"Valor background: {int(value)}")
 
-        def apply_histogram(data):
+        def update_percentile(value):
+            self.percentile_label.configure(text=f"Percentil: {int(value)}")
 
-            def training_histogram(data):
+        def apply_histogram():
+
+            def training_histogram():
                 background = int(self.background_slider.get())
+                percentiles = int(self.percentile_slider.get())
 
-                # Obtener el histograma de intensidades
-                histogram, bins = numpy.histogram(
-                    data[data > background].flatten(), bins=256, range=(0, 256)
-                )
+                reference_data = nibabel.load("sub-02_T1w.nii").get_fdata().flatten()
 
-                return histogram, bins
+                reference = numpy.linspace(5, 95, percentiles)
+                reference_landmarks = numpy.percentile(reference_data, reference)
+                piece_wise_func = []
 
-            def transform_histogram(data, target_histogram, target_bins):
-                background = int(self.background_slider.get())
+                for i in range(0, len(reference_landmarks)):
+                    m = (reference_landmarks[i] - reference_landmarks[i - 1]) / (
+                        reference[i] - reference[i - 1]
+                    )
+                    b = reference_landmarks[i - 1] - m * reference[i - 1]
+                    fx = lambda x, m=m, b=b: m * x + b
+                    piece_wise_func.append([m, b, fx])
 
-                # Obtener el histograma de intensidades
-                histogram, bins = numpy.histogram(
-                    data[data > background].flatten(), bins=256, range=(0, 256)
-                )
+                # print(piece_wise_func)
 
-                # Calcular la función de densidad de probabilidad
-                pdf = histogram / histogram.sum()
-                target_pdf = target_histogram / target_histogram.sum()
+                return piece_wise_func
 
-                # Calcular la función de distribución acumulada
-                cdf = pdf.cumsum()
-                target_cdf = target_pdf.cumsum()
+            def transform_histogram(piecewise_func):
+                img = self.data.copy()
+                img_flat = img.flatten()
 
-                # Crear la imagen ecualizada
-                equalized_data = numpy.interp(
-                    data.flatten(), bins[:-1], target_cdf * 255
-                )
+                percentiles = numpy.linspace(5, 95, int(self.percentile_slider.get()))
 
-                self.modified_data = equalized_data.reshape(data.shape)
+                transformed_data = []
 
+                for pixel_value in img_flat:
+                    for segment in piecewise_func:
+                        m, b, fx = segment
+                        if (
+                            pixel_value >= percentiles[0]
+                            and pixel_value < percentiles[1]
+                        ):
+                            transformed_data.append(fx(pixel_value))
+                            break
+                    else:
+                        transformed_data.append(pixel_value)
+
+                transformed_data = numpy.array(transformed_data).reshape(img.shape)
+
+                self.modified_data = transformed_data
                 self.update_image()
 
-            data2 = nibabel.load("sub-02_T1w.nii").get_fdata()
-
-            transform_histogram(self.data, *training_histogram(data2))
+            transform_histogram(training_histogram())
 
         self.procesamiento_frame = customtkinter.CTkFrame(
             self, width=140, corner_radius=0
@@ -408,48 +423,53 @@ class GUI(customtkinter.CTk):
         self.background_slider.set(10)
         self.background_slider.grid(row=2, column=0, padx=20, pady=10)
 
+        self.percentile_label = customtkinter.CTkLabel(
+            self.procesamiento_frame, text="Percentil: 10", font=("Arial", 10)
+        )
+        self.percentile_label.grid(row=3, column=0, padx=20, pady=(10, 0))
+
+        self.percentile_slider = customtkinter.CTkSlider(
+            self.procesamiento_frame,
+            from_=1,
+            to=100,
+            number_of_steps=99,
+            state="normal",
+            command=update_percentile,
+        )
+        self.percentile_slider.set(10)
+        self.percentile_slider.grid(row=4, column=0, padx=20, pady=10)
+
         self.histogram_button = customtkinter.CTkButton(
             self.procesamiento_frame,
             text="Aplicar histograma",
-            command=lambda: apply_histogram(self.data),
+            command=apply_histogram,
         )
-        self.histogram_button.grid(row=3, column=0, padx=20, pady=(10, 20))
+        self.histogram_button.grid(row=5, column=0, padx=20, pady=(10, 20))
 
     def white_stripe(self):
         self.no_procesamiento()
 
-        def update_percentil(value):
-            self.percentil_label.configure(text=f"Percentil: {int(value)}")
+        def update_background(value):
+            self.background_label.configure(text=f"Background: {int(value)}")
 
         def apply_white_stripe():
 
             data = self.data.copy()
 
-            data = data[data > 20]
+            hist, bin_edges = numpy.histogram(data[data > 10].flatten(), bins=100)
 
-            percentile = int(self.percentil_slider.get())
+            peaks, *args = find_peaks(hist, height=100)
 
-            histograma, bins = numpy.histogram(data.flatten(), bins=100)
-
-            hist = matplotlib.pyplot.hist(data.flatten(), 100)
+            # matplotlib.pyplot.plot(hist)
+            # matplotlib.pyplot.plot(peaks, hist[peaks], "x")
             # matplotlib.pyplot.show()
 
-            ultimo_pico = numpy.max(histograma)
+            peakValues = bin_edges[peaks]
 
-            print(ultimo_pico)
+            image_data_rescaled = data / peakValues[9]
+            print(peakValues[9])
 
-            imagen_normalizada = data * ultimo_pico
-
-            self.modified_data = imagen_normalizada
-
-            matplotlib.pyplot.figure(figsize=(12, 4))
-            matplotlib.pyplot.subplot(1, 2, 1)
-            matplotlib.pyplot.imshow(data[0], cmap="gray")
-            matplotlib.pyplot.title("Original")
-            matplotlib.pyplot.subplot(1, 2, 2)
-            matplotlib.pyplot.imshow(imagen_normalizada[0], cmap="gray")
-            matplotlib.pyplot.title("White Stripe")
-            matplotlib.pyplot.show()
+            self.modified_data = image_data_rescaled
 
             self.update_image()
 
@@ -465,21 +485,21 @@ class GUI(customtkinter.CTk):
         )
         self.titulo_label.grid(row=0, column=0, padx=20, pady=(20, 10))
 
-        self.percentil_label = customtkinter.CTkLabel(
-            self.procesamiento_frame, text="Percentil: 10", font=("Arial", 10)
+        self.background_label = customtkinter.CTkLabel(
+            self.procesamiento_frame, text="Background: 10", font=("Arial", 10)
         )
-        self.percentil_label.grid(row=1, column=0, padx=20, pady=(10, 0))
+        self.background_label.grid(row=1, column=0, padx=20, pady=(10, 0))
 
-        self.percentil_slider = customtkinter.CTkSlider(
+        self.background_slider = customtkinter.CTkSlider(
             self.procesamiento_frame,
             from_=0,
             to=100,
             number_of_steps=100,
             state="normal",
-            command=update_percentil,
+            command=update_background,
         )
-        self.percentil_slider.set(10)
-        self.percentil_slider.grid(row=2, column=0, padx=20, pady=10)
+        self.background_slider.set(10)
+        self.background_slider.grid(row=2, column=0, padx=20, pady=10)
 
         self.white_stripe_button = customtkinter.CTkButton(
             self.procesamiento_frame,
@@ -500,6 +520,7 @@ class GUI(customtkinter.CTk):
             data = (data - min_value) / (max_value - min_value)
 
             self.modified_data = data
+
             self.update_image()
 
         self.procesamiento_frame = customtkinter.CTkFrame(
@@ -547,14 +568,11 @@ class GUI(customtkinter.CTk):
             mean_value = img[img > background].mean()
             std_value = img[img > background].std()
 
-            img_zcore = (img - mean_value) / std_value
+            img_zscore = (img - mean_value) / std_value
 
-            img *= img_zcore
+            img = img * img_zscore
 
             self.modified_data = img
-
-            # matplotlib.pyplot.hist(img_zcore[img > 10], 100)
-            # matplotlib.pyplot.show()
 
             self.update_image()
 
