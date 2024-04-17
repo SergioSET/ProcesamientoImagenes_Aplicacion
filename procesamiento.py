@@ -461,13 +461,15 @@ class GUI(customtkinter.CTk):
 
             peaks, properties = find_peaks(histogram, height=10000)
 
-            # matplotlib.pyplot.plot(histogram)
-            # matplotlib.pyplot.plot(peaks, histogram[peaks], "x")
-            # matplotlib.pyplot.show()
+            matplotlib.pyplot.plot(histogram)
+            matplotlib.pyplot.plot(peaks, histogram[peaks], "o")
+            matplotlib.pyplot.show()
 
             peakValues = edges[peaks]
+
+            ws = peakValues[len(peakValues) - 1] - peakValues[0]
             
-            image_data_rescaled = data / peakValues[len(peakValues) - 1]
+            image_data_rescaled = data / ws
 
             self.modified_data = image_data_rescaled
 
