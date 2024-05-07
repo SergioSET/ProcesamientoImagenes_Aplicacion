@@ -12,6 +12,10 @@ from queue import Queue
 from skimage import io, img_as_ubyte
 from scipy.signal import find_peaks
 import SimpleITK as sitk
+from scipy.ndimage import laplace
+import numpy as np
+from scipy.sparse import spdiags
+from scipy.sparse.linalg import spsolve
 
 customtkinter.set_appearance_mode("Dark")
 customtkinter.set_default_color_theme("green")
@@ -336,7 +340,12 @@ class GUI(customtkinter.CTk):
         self.no_registro()
 
         def apply_borders():
-            self.modified_data = ndimage.sobel(self.modified_data)
+            sobel_h = ndimage.sobel(self.modified_data, 0)
+            sobel_v = ndimage.sobel(self.modified_data, 1)
+            magnitude = np.sqrt(sobel_h ** 2 + sobel_v ** 2)
+            magnitude *= 255.0 / np.max(magnitude)
+
+            self.modified_data = magnitude
             self.update_image()
 
         self.registro_frame = customtkinter.CTkFrame(
@@ -352,7 +361,7 @@ class GUI(customtkinter.CTk):
         self.bordes_label.grid(row=0, column=0, padx=20, pady=(20, 10))
 
         self.bordes_button = customtkinter.CTkButton(
-            self.registro_frame, text="Aplicar Sobel", command=apply_borders
+            self.registro_frame, text="Detectar bordes", command=apply_borders
         )
         self.bordes_button.grid(row=1, column=0, padx=20, pady=(10, 20))
 
