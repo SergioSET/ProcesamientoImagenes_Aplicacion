@@ -11,6 +11,7 @@ from scipy import ndimage
 from queue import Queue
 from skimage import io, img_as_ubyte
 from scipy.signal import find_peaks
+import SimpleITK as sitk
 
 customtkinter.set_appearance_mode("Dark")
 customtkinter.set_default_color_theme("green")
@@ -334,10 +335,14 @@ class GUI(customtkinter.CTk):
     def borders(self):
         self.no_registro()
 
-        self.registro_frame = customtkinter.CTkScrollableFrame(
-            self.sidebar_frame, width=230, corner_radius=0
+        def apply_borders():
+            self.modified_data = ndimage.sobel(self.modified_data)
+            self.update_image()
+
+        self.registro_frame = customtkinter.CTkFrame(
+            self, width=140, corner_radius=0
         )
-        self.registro_frame.grid(row=6, column=0, padx=20, pady=(10, 20))
+        self.registro_frame.grid(row=0, column=0, rowspan=6, sticky="nsew")
 
         self.bordes_label = customtkinter.CTkLabel(
             self.registro_frame,
@@ -347,7 +352,7 @@ class GUI(customtkinter.CTk):
         self.bordes_label.grid(row=0, column=0, padx=20, pady=(20, 10))
 
         self.bordes_button = customtkinter.CTkButton(
-            self.registro_frame, text="Aplicar Laplace", command=self.apply_borders
+            self.registro_frame, text="Aplicar Sobel", command=apply_borders
         )
         self.bordes_button.grid(row=1, column=0, padx=20, pady=(10, 20))
 
@@ -363,6 +368,11 @@ class GUI(customtkinter.CTk):
             self.select_file2.destroy()
             self.moving_layer_slider.configure(from_=0, to=self.moving_shape[self.dimension] - 1)
             self.moving_layer_slider.configure(state="normal")
+            self.moving_layer_slider.set(self.moving_shape[self.dimension] // 2)
+            self.register_lineal_button.configure(state="normal")
+            self.moving_dimension_select.configure(state="normal")
+            self.reset_register_button.configure(state="normal")
+            self.update_image()
             self.show_moving_image()
         
     def show_moving_image(self, *args):
@@ -374,11 +384,19 @@ class GUI(customtkinter.CTk):
             self.moving_ax = self.moving_canvas.figure.add_subplot(111)
             self.moving_canvas.get_tk_widget().grid(row=0, column=2, rowspan=6, sticky="nsew")
 
+        if self.moving_dimension_select.get() == "Dimensión 1":
+            dimension = 0
+        elif self.moving_dimension_select.get() == "Dimensión 2":
+            dimension = 1
+        else:
+            dimension = 2
+        
         layer = int(self.moving_layer_slider.get())
+        self.moving_layer_label.configure(text=f"Layer: {layer}")
 
-        if self.dimension == 0:
+        if dimension == 0:
             slice_data = np.rot90(self.moving_data[layer, :, :])
-        elif self.dimension == 1:
+        elif dimension == 1:
             slice_data = np.rot90(self.moving_data[:, layer, :])
         else:
             slice_data = np.rot90(self.moving_data[:, :, layer])
@@ -390,25 +408,34 @@ class GUI(customtkinter.CTk):
         self.moving_ax.title.set_text("Imagen móvil")
         self.moving_ax.axis("off")
 
-        self.update_image()
         self.moving_canvas.draw()
 
-    def apply_registration(self, *args):
-        
-        fixed_image = self.image
-        if self.dimension == 0:
-            moving_image = np.rot90(self.moving_data[0, :, :])
-        elif self.dimension == 1:
-            moving_image = np.rot90(self.moving_data[:, 0, :])
-        else:
-            moving_image = np.rot90(self.moving_data[:, :, 0])
+    def apply_lineal_registration(self, *args):
+        fixed_image = sitk.GetImageFromArray(self.data)
+        moving_image = sitk.GetImageFromArray(self.moving_data)
 
-        # Recorrer las capas de la imagen movil hasta encontrar la que concuerde
+        method = sitk.ImageRegistrationMethod()
+        method.SetMetricAsMeanSquares()
+        method.SetInterpolator(sitk.sitkLinear)
+        method.SetOptimizerAsRegularStepGradientDescent(learningRate=0.1, minStep=1e-4, numberOfIterations=100)
+        method.SetOptimizerScalesFromIndexShift()
 
+        transformacion = sitk.AffineTransform(3)
+        initial_transform = sitk.CenteredTransformInitializer(fixed_image, moving_image, transformacion)
+        method.SetInitialTransform(initial_transform)
+        final_transform = method.Execute(fixed_image, moving_image)
+
+        registered_image = sitk.Resample(moving_image, fixed_image, final_transform, sitk.sitkLinear, 0.0, moving_image.GetPixelID())
+
+        self.moving_data = sitk.GetArrayFromImage(registered_image)
         self.show_moving_image()
 
     def register(self):
         self.no_registro()
+
+        def reset_register():
+            self.moving_data = self.moving_image.get_fdata()
+            self.show_moving_image()
 
         self.registro_frame = customtkinter.CTkFrame(
             self, width=140, corner_radius=0
@@ -427,10 +454,25 @@ class GUI(customtkinter.CTk):
         )
         self.select_file2.grid(row=7, column=0, padx=20, pady=(10, 20))
 
+        self.moving_dimensiones_label = customtkinter.CTkLabel(
+            self.registro_frame,
+            text="Dimensiones",
+            font=customtkinter.CTkFont(size=20, weight="bold"),
+        )
+        self.moving_dimensiones_label.grid(row=8, column=0, padx=20, pady=(20, 10))
+
+        self.moving_dimension_select = customtkinter.CTkOptionMenu(
+            self.registro_frame,
+            values=["Dimensión 1", "Dimensión 2", "Dimensión 3"],
+            state="disabled",
+            command=self.show_moving_image,
+        )
+        self.moving_dimension_select.grid(row=9, column=0, padx=20, pady=(20, 10))
+
         self.moving_layer_label = customtkinter.CTkLabel(
             self.registro_frame, text="Layer:", anchor="w"
         )
-        self.moving_layer_label.grid(row=8, column=0, padx=20, pady=(10, 0))
+        self.moving_layer_label.grid(row=10, column=0, padx=20, pady=(10, 0))
 
         self.moving_layer_slider = customtkinter.CTkSlider(
             self.registro_frame,
@@ -439,12 +481,18 @@ class GUI(customtkinter.CTk):
             state="disabled",
             command=self.show_moving_image,
         )
-        self.moving_layer_slider.grid(row=9, column=0, padx=20, pady=10)
+        self.moving_layer_slider.grid(row=11, column=0, padx=20, pady=10)
 
-        self.register_button = customtkinter.CTkButton(
-            self.registro_frame, text="Aplicar registro", command=self.apply_registration
+        self.register_lineal_button = customtkinter.CTkButton(
+            self.registro_frame, text="Aplicar registro lineal", command=self.apply_lineal_registration, state="disabled"
         )
-        self.register_button.grid(row=10, column=0, padx=20, pady=(10, 20))
+        self.register_lineal_button.grid(row=12, column=0, padx=20, pady=(10, 20))
+
+        self.reset_register_button = customtkinter.CTkButton(
+            self.registro_frame, text="Restaurar imagen", command=reset_register, state="disabled"
+        )
+        self.reset_register_button.grid(row=13, column=0, padx=20, pady=(10, 20))
+        
 
         self.moving_canvas = None
 
