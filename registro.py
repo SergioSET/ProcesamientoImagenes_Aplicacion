@@ -345,7 +345,7 @@ class GUI(customtkinter.CTk):
             magnitude = np.sqrt(sobel_h ** 2 + sobel_v ** 2)
             magnitude *= 255.0 / np.max(magnitude)
 
-            self.modified_data = magnitude
+            self.modified_data = magnitude > 30
             self.update_image()
 
         self.registro_frame = customtkinter.CTkFrame(
@@ -426,7 +426,7 @@ class GUI(customtkinter.CTk):
         method = sitk.ImageRegistrationMethod()
         method.SetMetricAsMeanSquares()
         method.SetInterpolator(sitk.sitkLinear)
-        method.SetOptimizerAsRegularStepGradientDescent(learningRate=0.1, minStep=1e-4, numberOfIterations=100)
+        method.SetOptimizerAsRegularStepGradientDescent(learningRate=0.1, minStep=1e-4, numberOfIterations=120)
         method.SetOptimizerScalesFromIndexShift()
 
         transformacion = sitk.AffineTransform(3)
