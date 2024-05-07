@@ -1,3 +1,4 @@
+import numpy as np
 from PIL import Image
 import tkinter
 import tkinter.messagebox
@@ -99,7 +100,7 @@ class GUI(customtkinter.CTk):
         self.open_file_button.destroy()
         self.load_default_file_button.destroy()
         self.sidebar_frame = customtkinter.CTkScrollableFrame(self, width=230, corner_radius=0)
-        self.sidebar_frame.grid(row=0, column=2, rowspan=6, sticky="nsew")
+        self.sidebar_frame.grid(row=0, column=3, rowspan=6, sticky="nsew")
 
         self.dimensiones_label = customtkinter.CTkLabel(
             self.sidebar_frame,
@@ -223,11 +224,11 @@ class GUI(customtkinter.CTk):
 
     def update_image(self):
         if self.dimension == 0:
-            slice_data = numpy.rot90(self.modified_data[self.layer, :, :])
+            slice_data = np.rot90(self.modified_data[self.layer, :, :])
         elif self.dimension == 1:
-            slice_data = numpy.rot90(self.modified_data[:, self.layer, :])
+            slice_data = np.rot90(self.modified_data[:, self.layer, :])
         else:
-            slice_data = numpy.rot90(self.modified_data[:, :, self.layer])
+            slice_data = np.rot90(self.modified_data[:, :, self.layer])
 
         self.image = slice_data
 
@@ -250,6 +251,9 @@ class GUI(customtkinter.CTk):
         self.ax.set_xlabel("X")
         self.ax.set_ylabel("Y")
         self.ax.axis("off")
+
+        if self.moving_image:
+            self.ax.title.set_text("Fixed")
 
         self.fig.canvas.mpl_connect("button_press_event", self.on_click)
         self.fig.canvas.mpl_connect("motion_notify_event", self.on_drag)
@@ -356,8 +360,52 @@ class GUI(customtkinter.CTk):
             self.moving_image = nibabel.load(file_path)
             self.moving_data = self.moving_image.get_fdata()
             self.moving_shape = self.moving_data.shape
+            self.select_file2.destroy()
+            self.moving_layer_slider.configure(from_=0, to=self.moving_shape[self.dimension] - 1)
+            self.moving_layer_slider.configure(state="normal")
+            self.show_moving_image()
+        
+    def show_moving_image(self, *args):
+        if self.moving_canvas is None:
+            self.grid_columnconfigure((0, 3), weight=0)
+            self.grid_columnconfigure((1, 2), weight=1)
 
-        print(self.moving_data.shape)
+            self.moving_canvas = FigureCanvasTkAgg(matplotlib.pyplot.Figure(figsize=(5, 5)), master=self)
+            self.moving_ax = self.moving_canvas.figure.add_subplot(111)
+            self.moving_canvas.get_tk_widget().grid(row=0, column=2, rowspan=6, sticky="nsew")
+
+        layer = int(self.moving_layer_slider.get())
+
+        if self.dimension == 0:
+            slice_data = np.rot90(self.moving_data[layer, :, :])
+        elif self.dimension == 1:
+            slice_data = np.rot90(self.moving_data[:, layer, :])
+        else:
+            slice_data = np.rot90(self.moving_data[:, :, layer])
+
+        self.moving_ax.clear()
+        self.moving_ax.imshow(slice_data, cmap="gray")
+        self.moving_ax.set_xlabel("X")
+        self.moving_ax.set_ylabel("Y")
+        self.moving_ax.title.set_text("Imagen móvil")
+        self.moving_ax.axis("off")
+
+        self.update_image()
+        self.moving_canvas.draw()
+
+    def apply_registration(self, *args):
+        
+        fixed_image = self.image
+        if self.dimension == 0:
+            moving_image = np.rot90(self.moving_data[0, :, :])
+        elif self.dimension == 1:
+            moving_image = np.rot90(self.moving_data[:, 0, :])
+        else:
+            moving_image = np.rot90(self.moving_data[:, :, 0])
+
+        # Recorrer las capas de la imagen movil hasta encontrar la que concuerde
+
+        self.show_moving_image()
 
     def register(self):
         self.no_registro()
@@ -379,7 +427,26 @@ class GUI(customtkinter.CTk):
         )
         self.select_file2.grid(row=7, column=0, padx=20, pady=(10, 20))
 
-        
+        self.moving_layer_label = customtkinter.CTkLabel(
+            self.registro_frame, text="Layer:", anchor="w"
+        )
+        self.moving_layer_label.grid(row=8, column=0, padx=20, pady=(10, 0))
+
+        self.moving_layer_slider = customtkinter.CTkSlider(
+            self.registro_frame,
+            from_=0,
+            to=100,
+            state="disabled",
+            command=self.show_moving_image,
+        )
+        self.moving_layer_slider.grid(row=9, column=0, padx=20, pady=10)
+
+        self.register_button = customtkinter.CTkButton(
+            self.registro_frame, text="Aplicar registro", command=self.apply_registration
+        )
+        self.register_button.grid(row=10, column=0, padx=20, pady=(10, 20))
+
+        self.moving_canvas = None
 
 
 def main():
