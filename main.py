@@ -2,6 +2,7 @@ import tkinter
 import customtkinter
 import segmentacion as seg
 import procesamiento as proc
+import registro as reg
 
 customtkinter.set_appearance_mode("Dark")
 customtkinter.set_default_color_theme("green")
@@ -37,6 +38,11 @@ class GUI(customtkinter.CTk):
             self, text="Procesamiento", command=self.select_option2
         )
         self.button2.grid(row=0, column=1, padx=10, pady=10, sticky="nsew")
+
+        self.button3 = customtkinter.CTkButton(
+            self, text="Bordes y Registro", command=reg.main
+        )
+        self.button3.grid(row=0, column=2, padx=10, pady=10, sticky="nsew")
 
 
 if __name__ == "__main__":
