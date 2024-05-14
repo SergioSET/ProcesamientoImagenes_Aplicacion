@@ -37,7 +37,8 @@ class AplicacionDibujo:
         print(self.coordenadas)
 
     def abrir_imagen(self):
-        ruta_imagen = filedialog.askopenfilename(title="Abrir imagen", filetypes=[("Archivos de imagen", "*.png;*.jpg;*.jpeg")])
+        # ruta_imagen = filedialog.askopenfilename(title="Abrir imagen", filetypes=[("Archivos de imagen", "*.png;*.jpg;*.jpeg")])
+        ruta_imagen = filedialog.askopenfilename(title="Abrir imagen", filetypes=[("Archivos de imagen", "*.*")])
         if ruta_imagen:
             self.imagen = plt.imread(ruta_imagen)
             self.ax.imshow(self.imagen)
@@ -91,6 +92,17 @@ class AplicacionDibujo:
         # plt.imshow(weights, cmap='gray')
         # plt.colorbar()
         # plt.show()
+
+        def laplacian_coordinates_matrix(weights):
+            D = np.diag(weights.sum(axis=1))
+            L = D - weights
+            return L
+        
+        L = laplacian_coordinates_matrix(weights)
+
+        print("Tamaño matrix de Laplacian: ", L.shape)
+
+        
 
         
 
