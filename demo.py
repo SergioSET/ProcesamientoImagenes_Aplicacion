@@ -203,6 +203,7 @@ class GUI(customtkinter.CTk):
     def on_release(self, event):
         if event.inaxes == self.ax and event.button == 1:
             self.drawn_objects.append(self.current_stroke)
+            print(self.current_stroke)
             self.current_stroke = []
 
     def draw_current_stroke(self):
@@ -231,21 +232,25 @@ class GUI(customtkinter.CTk):
         matplotlib.pyplot.imsave("modified_image.jpg", self.modified_data, cmap="gray")
 
     def start_processing(self):
-        def laplacian_matrix(W):
-            D = np.diag(np.sum(W, axis=1))
-            
-            L = D - W
-            
-            return L
 
-        W = np.array([[0, 1, 0, 0],
-                    [1, 0, 1, 1],
-                    [0, 1, 0, 0],
-                    [0, 1, 0, 0]])
+        print(self.drawn_objects)
 
-        L = laplacian_matrix(W)
-        print("Laplacian Matrix L:")
-        print(L)
+
+        # def laplacian_matrix(W):
+        #     D = np.diag(np.sum(W, axis=1))
+            
+        #     L = D - W
+            
+        #     return L
+
+        # W = np.array([[0, 1, 0, 0],
+        #             [1, 0, 1, 1],
+        #             [0, 1, 0, 0],
+        #             [0, 1, 0, 0]])
+
+        # L = laplacian_matrix(W)
+        # print("Laplacian Matrix L:")
+        # print(L)
 
 
 def main():
