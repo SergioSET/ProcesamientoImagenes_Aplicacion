@@ -25,7 +25,9 @@ class AplicacionDibujo:
 
         self.coordenadas = []
 
-        self.figura.canvas.mpl_connect('button_press_event', self.dibujar)
+        self.figura.canvas.mpl_connect("button_press_event", self.on_click)
+        self.figura.canvas.mpl_connect("motion_notify_event", self.on_drag)
+        self.figura.canvas.mpl_connect("button_release_event", self.on_release)
 
         self.menu = tk.Menu(ventana)
         self.ventana.config(menu=self.menu)
@@ -64,6 +66,28 @@ class AplicacionDibujo:
             self.coordenadas.append((x, y, color))
             for coord in self.coordenadas:
                 self.ax.plot(coord[0], coord[1], marker='o', markersize=5, color=coord[2])
+            self.figura.canvas.draw()
+    
+    def on_click(self, event):
+        if event.inaxes == self.ax:
+            x = int(round(event.xdata))
+            y = int(round(event.ydata))
+            color = 'g' if event.button == 1 else 'r'
+            self.coordenadas.append((x, y, color))
+            self.ax.plot(x, y, marker='o', markersize=5, color=color)
+            self.figura.canvas.draw()
+
+    def on_drag(self, event):
+        if event.inaxes == self.ax and event.button == 1:
+            x = int(round(event.xdata))
+            y = int(round(event.ydata))
+            color = 'g' if event.button == 1 else 'r'
+            self.coordenadas.append((x, y, color))
+            self.ax.plot(x, y, marker='o', markersize=5, color=color)
+            self.figura.canvas.draw()
+
+    def on_release(self, event):
+        if event.inaxes == self.ax:
             self.figura.canvas.draw()
 
     def limpiar_dibujo(self):
