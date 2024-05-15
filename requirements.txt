@@ -9,3 +9,4 @@ scikit-learn
 customtkinter
 scikit-image
 simpleitk
+scipy
