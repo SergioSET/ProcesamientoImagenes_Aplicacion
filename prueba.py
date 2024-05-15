@@ -7,6 +7,7 @@ from scipy.spatial.distance import pdist, squareform
 import scipy
 import scipy.sparse as sp
 from scipy.sparse.linalg import spsolve, factorized
+from PIL import Image
 
 class AplicacionDibujo:
     def __init__(self, ventana):
@@ -41,12 +42,12 @@ class AplicacionDibujo:
         print(self.coordenadas)
 
     def abrir_imagen(self):
-        # ruta_imagen = filedialog.askopenfilename(title="Abrir imagen", filetypes=[("Archivos de imagen", "*.png;*.jpg;*.jpeg")])
-        ruta_imagen = filedialog.askopenfilename(title="Abrir imagen", filetypes=[("Archivos de imagen", "*.*")])
+        ruta_imagen = filedialog.askopenfilename(title="Abrir imagen", filetypes=[("Archivos de imagen", "*.png;*.jpg;*.jpeg")])
         if ruta_imagen:
-            self.imagen = plt.imread(ruta_imagen)
-            # self.imagen = np.array(self.imagen  * 255, dtype=np.uint8)
-            self.ax.imshow(self.imagen)
+            self.imagen = Image.open(ruta_imagen).convert('L')
+            self.imagen = np.array(self.imagen)
+
+            self.ax.imshow(self.imagen, cmap='gray')
             self.ax.set_axis_off()
             self.figura.canvas.draw()
 
@@ -66,14 +67,11 @@ class AplicacionDibujo:
             self.figura.canvas.draw()
 
     def limpiar_dibujo(self):
-        # Borra las coordenadas almacenadas
         self.coordenadas = []
-        # Elimina todas las líneas dibujadas en el gráfico
+        
         for line in self.ax.lines:
             line.remove()
-        # Redibuja la imagen original
-        # self.ax.imshow(self.imagen)
-        # Actualiza el lienzo
+            
         self.figura.canvas.draw()
 
     def procesar(self):
@@ -85,32 +83,28 @@ class AplicacionDibujo:
         h, w = self.imagen.shape[:2]
         
         def laplacian_coordinates_weights(img, epsilon=10e-6):
-            # weights = np.zeros((h*w, h*w))
             weights = sp.lil_matrix((h*w, h*w))
 
-            sigma = 1
+            sigma = np.max(np.abs(np.diff(self.imagen.flatten())))
+            print("Sigma: ", sigma)
 
             for i in range(h):
                 for j in range(w):
                     idx = i*w + j
                     if i > 0:
-                        weights[idx, (i-1)*w+j] = np.exp(-((img[i,j] - img[i-1,j])**2).sum() / sigma)
+                        weights[idx, (i-1)*w+j] = np.exp(- epsilon * ((img[i,j] - img[i-1,j])**2).sum() / sigma)
                     if i < h-1:
-                        weights[idx, (i+1)*w+j] = np.exp(-((img[i,j] - img[i+1,j])**2).sum() / sigma)
+                        weights[idx, (i+1)*w+j] = np.exp(- epsilon * ((img[i,j] - img[i+1,j])**2).sum() / sigma)
                     if j > 0:
-                        weights[idx, i*w+j-1] = np.exp(-((img[i,j] - img[i,j-1])**2).sum() / sigma)
+                        weights[idx, i*w+j-1] = np.exp(- epsilon * ((img[i,j] - img[i,j-1])**2).sum() / sigma)
                     if j < w-1:
-                        weights[idx, i*w+j+1] = np.exp(-((img[i,j] - img[i,j+1])**2).sum() / sigma)
+                        weights[idx, i*w+j+1] = np.exp(- epsilon * ((img[i,j] - img[i,j+1])**2).sum() / sigma)
 
             return weights
 
-        img = np.array([[1, 2, 3], [4, 5, 6], [7, 8, 9]])  # Ejemplo de una imagen
-        img = self.imagen
-
-        weights = laplacian_coordinates_weights(img)
+        weights = laplacian_coordinates_weights(self.imagen)
         print("Tamaño matrix de pesos: ", weights.shape)
 
-        
         # plt.imshow(weights, cmap='gray')
         # plt.colorbar()
         # plt.show()
@@ -126,13 +120,24 @@ class AplicacionDibujo:
 
         I_s = sp.lil_matrix((h*w, h*w))
 
-
         b = np.zeros(h*w)
 
         indices = np.arange(h*w).reshape(h, w)
 
-        xB = -1
-        xF = 1
+        xB = 0
+        xF = 0
+
+        for i, j, color in self.coordenadas:
+            if color == 'g':
+                xB += self.imagen[i, j]
+            else:
+                xF += self.imagen[i, j]
+
+        xB = xB / len([c for c in self.coordenadas if c[2] == 'g'])
+        xF = xF / len([c for c in self.coordenadas if c[2] == 'r'])
+
+        print("xB: ", xB)
+        print("xF: ", xF)
         
         for (i, j, color) in self.coordenadas:
             index = indices[i, j]
@@ -152,11 +157,12 @@ class AplicacionDibujo:
 
         segmented_image = x.reshape((h, w))
 
-        self.limpiar_dibujo()
+        tau = (xB + xF) / 2
 
-        # self.imagen = np.where(segmented_image > 0, 1, 0)
- 
+        segmented_image = np.where(segmented_image < tau, self.imagen, 0)
+
         self.ax.imshow(segmented_image)
+        self.limpiar_dibujo()
         self.figura.canvas.draw()
 
 
