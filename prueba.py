@@ -116,14 +116,6 @@ class AplicacionDibujo:
         L = laplacian_coordinates_matrix(weights)
         print("Tamaño matrix de Laplacian: ", L.shape)
 
-        L2 = L.dot(L)
-
-        I_s = sp.lil_matrix((h*w, h*w))
-
-        b = np.zeros(h*w)
-
-        indices = np.arange(h*w).reshape(h, w)
-
         xB = 0
         xF = 0
 
@@ -139,20 +131,21 @@ class AplicacionDibujo:
         print("xB: ", xB)
         print("xF: ", xF)
         
+        Is = sp.lil_matrix((h*w, h*w))
+        L_2 = L.dot(L)
+        b = np.zeros(h*w)
+        
+        indices = np.array([[i*w+j for j in range(w)] for i in range(h)])
         for (i, j, color) in self.coordenadas:
             index = indices[i, j]
-            I_s[index, index] = 1
+            Is[index, index] = 1
             b[index] = xB if color == 'g' else xF
             # print(i, j, color)    
 
-        print("Tamaño matrix de I_s: ", I_s.shape)
+        print("Tamaño matrix de Is: ", Is.shape)
 
-        A = I_s + L2
-
-        A = sp.csr_matrix(A)
-
+        A = sp.csr_matrix(Is + L_2)
         solve = factorized(A)
-
         x = solve(b)
 
         segmented_image = x.reshape((h, w))
