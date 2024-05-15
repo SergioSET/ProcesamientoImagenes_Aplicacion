@@ -176,6 +176,10 @@ class AplicacionDibujo:
 
         tau = (xB + xF) / 2
 
+        segmented_image = np.rot90(segmented_image, 3)
+
+        segmented_image = [fila[::-1] for fila in segmented_image]
+
         segmented_image = np.where(segmented_image < tau, self.imagen, 0)
 
         self.ax.imshow(segmented_image)
