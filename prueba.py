@@ -104,7 +104,7 @@ class AplicacionDibujo:
         print("Procesando...")
         # print(self.coordenadas)
 
-        h, w = self.imagen.shape[:2]
+        h, w = self.imagen.shape
         
         def laplacian_coordinates_weights(img, epsilon=10e-6):
             weights = sp.lil_matrix((h*w, h*w))
