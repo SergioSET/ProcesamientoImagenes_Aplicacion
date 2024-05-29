@@ -149,8 +149,11 @@ class AplicacionDibujo:
             else:
                 xF += self.imagen[i, j]
 
-        xB = xB / len([c for c in self.coordenadas if c[2] == 'g'])
-        xF = xF / len([c for c in self.coordenadas if c[2] == 'r'])
+        # xB = xB / len([c for c in self.coordenadas if c[2] == 'g'])
+        # xF = xF / len([c for c in self.coordenadas if c[2] == 'r'])
+
+        xB = -1
+        xF = 1
 
         print("xB: ", xB)
         print("xF: ", xF)
