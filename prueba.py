@@ -49,7 +49,7 @@ class AplicacionDibujo:
             self.imagen = Image.open(ruta_imagen).convert('L')
             self.imagen = np.array(self.imagen)
 
-            self.ax.imshow(self.imagen, cmap='gray')
+            self.ax.imshow(self.imagen)
             self.ax.set_axis_off()
             self.figura.canvas.draw()
 
@@ -73,7 +73,7 @@ class AplicacionDibujo:
             x = int(round(event.xdata))
             y = int(round(event.ydata))
             color = 'g' if event.button == 1 else 'r'
-            self.coordenadas.append((x, y, color))
+            self.coordenadas.append((y, x, color))
             self.ax.plot(x, y, marker='o', markersize=5, color=color)
             self.figura.canvas.draw()
 
@@ -82,7 +82,7 @@ class AplicacionDibujo:
             x = int(round(event.xdata))
             y = int(round(event.ydata))
             color = 'g' if event.button == 1 else 'r'
-            self.coordenadas.append((x, y, color))
+            self.coordenadas.append((y, x, color))
             self.ax.plot(x, y, marker='o', markersize=5, color=color)
             self.figura.canvas.draw()
 
@@ -175,10 +175,6 @@ class AplicacionDibujo:
         segmented_image = x.reshape((h, w))
 
         tau = (xB + xF) / 2
-
-        segmented_image = np.rot90(segmented_image, 3)
-
-        segmented_image = [fila[::-1] for fila in segmented_image]
 
         segmented_image = np.where(segmented_image < tau, self.imagen, 0)
 
